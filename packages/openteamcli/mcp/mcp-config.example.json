@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "openteam": {
+      "command": "node",
+      "args": ["packages/openteamcli/mcp/dist/index.js"],
+      "cwd": "<workspace-root>"
+    }
+  }
+}
