@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -44,7 +44,10 @@ async function daemonGet(path: string): Promise<unknown> {
     >;
     throw new Error(
       body?.error
-        ? String((body.error as Record<string, unknown>).message ?? `请求失败：HTTP ${response.status}`)
+        ? String(
+            (body.error as Record<string, unknown>).message ??
+              `请求失败：HTTP ${response.status}`
+          )
         : `请求失败：HTTP ${response.status}`
     );
   }
@@ -54,7 +57,7 @@ async function daemonGet(path: string): Promise<unknown> {
 async function daemonPost(
   path: string,
   body?: unknown
-): Promise<unknown> {
+): Promise<Record<string, unknown>> {
   const token = readToken();
   const response = await fetch(controlUrl(path), {
     method: "POST",
@@ -82,12 +85,12 @@ async function sendCommand(
   payload?: unknown,
   timeoutMs?: number
 ): Promise<unknown> {
-  const result = (await daemonPost("/command", {
+  const result = await daemonPost("/command", {
     id: `mcp-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     action,
     payload,
     timeoutMs: timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS,
-  })) as Record<string, unknown>;
+  });
   if (!result.ok) {
     const error = result.error as Record<string, unknown> | undefined;
     throw new Error(
@@ -96,10 +99,12 @@ async function sendCommand(
         : `命令 ${action} 执行失败`
     );
   }
-  return result.data;
+  return "data" in result ? result.data : undefined;
 }
 
-function textResult(data: unknown): { content: Array<{ type: "text"; text: string }> } {
+function textResult(
+  data: unknown
+): { content: Array<{ type: "text"; text: string }> } {
   return {
     content: [
       {
@@ -107,6 +112,23 @@ function textResult(data: unknown): { content: Array<{ type: "text"; text: strin
         text: JSON.stringify(data, null, 2),
       },
     ],
+  };
+}
+
+function errorResult(
+  message: string
+): {
+  content: Array<{ type: "text"; text: string }>;
+  isError: true;
+} {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({ ok: false, error: message }, null, 2),
+      },
+    ],
+    isError: true,
   };
 }
 
@@ -142,8 +164,9 @@ server.tool(
   async () => {
     try {
       const status = (await daemonGet("/status")) as Record<string, unknown>;
-      return textResult({
-        ok: Boolean(status.ok && status.extensionConnected),
+      const ok = Boolean(status.ok && status.extensionConnected);
+      const result = {
+        ok,
         daemon: {
           reachable: Boolean(status.ok),
           port: status.port,
@@ -155,16 +178,15 @@ server.tool(
           protocolVersion: status.protocolVersion,
           profiles: status.profiles ?? [],
         },
-        hint: status.extensionConnected
+        hint: ok
           ? undefined
           : '请打开 OpenTeam 插件页面，在设置里开启"本机智能体控制"。',
-      });
+      };
+      return ok ? textResult(result) : errorResult(JSON.stringify(result));
     } catch (error) {
-      return textResult({
-        ok: false,
-        daemon: { reachable: false },
-        hint: `Daemon 不可达：${error instanceof Error ? error.message : String(error)}。请先运行 openteamcli daemon start。`,
-      });
+      return errorResult(
+        `Daemon 不可达：${error instanceof Error ? error.message : String(error)}。请先运行 openteamcli daemon start。`
+      );
     }
   }
 );
@@ -196,10 +218,7 @@ server.tool(
   "创建一个新的 OpenTeam 群聊。",
   {
     name: z.string().describe("群聊名称"),
-    description: z
-      .string()
-      .optional()
-      .describe("群聊描述"),
+    description: z.string().optional().describe("群聊描述"),
     mode: z
       .enum(["collaborative", "independent"])
       .optional()
@@ -266,18 +285,12 @@ server.tool(
             .optional()
             .describe("角色来源，temporary 表示临时角色"),
           name: z.string().describe("角色名称"),
-          description: z
-            .string()
-            .optional()
-            .describe("角色描述"),
+          description: z.string().optional().describe("角色描述"),
           chatSite: z
             .enum(["deepseek", "chatgpt", "gemini", "claude", "grok"])
             .optional()
             .describe("角色使用的 AI 站点"),
-          systemPrompt: z
-            .string()
-            .optional()
-            .describe("角色的系统提示词"),
+          systemPrompt: z.string().optional().describe("角色的系统提示词"),
         })
       )
       .describe("要添加的角色列表"),
@@ -302,14 +315,19 @@ server.tool(
       ])
       .optional()
       .describe(
-        '任务目标：all（所有人）、{ roleIds: [...] }（按角色 ID）或 { roleNames: [...] }（按角色名称）。默认 all'
+        "任务目标：all（所有人）、{ roleIds: [...] }（按角色 ID）或 { roleNames: [...] }（按角色名称）。默认 all"
       ),
+    reference: z
+      .string()
+      .optional()
+      .describe("任务引用的上下文或参考信息"),
   },
-  async ({ chatId, content, target }) => {
+  async ({ chatId, content, target, reference }) => {
     const data = await sendCommand("task.post", {
       chatId,
       content,
       target: target ?? "all",
+      reference,
     });
     return textResult(data);
   }
@@ -355,7 +373,12 @@ server.tool(
   {
     chat: z
       .object({
-        name: z.string().optional().describe("群聊名称"),
+        name: z
+          .string()
+          .optional()
+          .describe(
+            "群聊名称。使用 by-name 复用策略时必填，否则可选（默认“智能体任务群聊”）"
+          ),
         description: z.string().optional().describe("群聊描述"),
         mode: z
           .enum(["collaborative", "independent"])
@@ -366,7 +389,9 @@ server.tool(
             strategy: z
               .enum(["none", "by-id", "by-name"])
               .optional()
-              .describe("复用策略：none（创建新群聊）、by-id（按 ID 复用）、by-name（按名称复用）"),
+              .describe(
+                "复用策略：none（创建新群聊）、by-id（按 ID 复用）、by-name（按名称复用）"
+              ),
             chatId: z.string().optional().describe("by-id 策略的群聊 ID"),
           })
           .optional()
@@ -402,6 +427,10 @@ server.tool(
           ])
           .optional()
           .describe("任务目标，默认 all"),
+        reference: z
+          .string()
+          .optional()
+          .describe("任务引用的上下文或参考信息"),
       })
       .describe("任务配置"),
     options: z
