@@ -11,7 +11,7 @@ type AddPersonItem =
 
 const TEMPLATE_CATEGORY_ALL = '全部'
 const PEOPLE_LIBRARY_PAGE_SIZE = 5
-const VISIBLE_CHAT_SITES = ['gemini', 'chatgpt', 'claude', 'deepseek', 'grok'] as const
+const VISIBLE_CHAT_SITES = ['gemini', 'chatgpt', 'claude', 'deepseek', 'grok', 'qwen'] as const
 
 export interface PeopleLibraryViewDependencies {
   state: TeamPageState
@@ -55,6 +55,7 @@ export interface PeopleLibraryViewDependencies {
   templateSiteClaudeEl: HTMLInputElement
   templateSiteDeepSeekEl: HTMLInputElement
   templateSiteGrokEl: HTMLInputElement
+  templateSiteQwenEl: HTMLInputElement
   templateSiteExternalEl: HTMLInputElement
   templateExternalModelFieldEl: HTMLElement
   templateExternalModelSelectEl: HTMLSelectElement
@@ -144,6 +145,7 @@ export function createPeopleLibraryView(deps: PeopleLibraryViewDependencies): Pe
       deps.templateSiteClaudeEl.checked = !externalSelected && defaultChatSite === 'claude'
       deps.templateSiteDeepSeekEl.checked = !externalSelected && defaultChatSite === 'deepseek'
       deps.templateSiteGrokEl.checked = !externalSelected && defaultChatSite === 'grok'
+      deps.templateSiteQwenEl.checked = !externalSelected && defaultChatSite === 'qwen'
       deps.templateSiteExternalEl.checked = externalSelected
       deps.templateExternalModelSelectEl.value = selectedTemplate.defaultExternalModelId ?? firstExternalModelId() ?? ''
       deps.templateChatGptGptsUrlEl.value = selectedTemplate.chatGptGptsUrl ?? ''
@@ -159,6 +161,7 @@ export function createPeopleLibraryView(deps: PeopleLibraryViewDependencies): Pe
       deps.templateSiteClaudeEl.checked = defaultChatSite === 'claude'
       deps.templateSiteDeepSeekEl.checked = defaultChatSite === 'deepseek'
       deps.templateSiteGrokEl.checked = defaultChatSite === 'grok'
+      deps.templateSiteQwenEl.checked = defaultChatSite === 'qwen'
       deps.templateSiteExternalEl.checked = false
       deps.templateExternalModelSelectEl.value = firstExternalModelId() ?? ''
       deps.templateChatGptGptsUrlEl.value = ''
@@ -819,6 +822,7 @@ export function createPeopleLibraryView(deps: PeopleLibraryViewDependencies): Pe
     if (deps.templateSiteClaudeEl.checked) return 'claude'
     if (deps.templateSiteDeepSeekEl.checked) return 'deepseek'
     if (deps.templateSiteGrokEl.checked) return 'grok'
+    if (deps.templateSiteQwenEl.checked) return 'qwen'
     return 'gemini'
   }
 
@@ -847,6 +851,7 @@ export function createPeopleLibraryView(deps: PeopleLibraryViewDependencies): Pe
       deps.templateSiteClaudeEl,
       deps.templateSiteDeepSeekEl,
       deps.templateSiteGrokEl,
+      deps.templateSiteQwenEl,
       deps.templateSiteExternalEl,
     ]
   }
@@ -954,6 +959,7 @@ function siteLabel(site: ChatSite | undefined): string {
   if (site === 'claude') return 'Claude'
   if (site === 'deepseek') return 'DeepSeek'
   if (site === 'grok') return 'Grok'
+  if (site === 'qwen') return 'Qwen'
   return 'Gemini'
 }
 

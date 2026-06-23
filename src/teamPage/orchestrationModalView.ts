@@ -1206,11 +1206,12 @@ function siteLabel(site: ChatSite): string {
   if (site === 'claude') return 'Claude'
   if (site === 'deepseek') return 'DeepSeek'
   if (site === 'grok') return 'Grok'
+  if (site === 'qwen') return 'Qwen'
   return 'Gemini'
 }
 
 function editableChatSites(): ChatSite[] {
-  return ['deepseek', 'grok', 'chatgpt', 'gemini', 'claude']
+  return ['deepseek', 'grok', 'chatgpt', 'gemini', 'claude', 'qwen']
 }
 
 function externalModelLabel(model: ExternalModelConfig | undefined): string {

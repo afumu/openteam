@@ -55,11 +55,14 @@ export function createDeepSeekAdapter(options: DeepSeekAdapterOptions = {}): Cha
     }
 
     setTextareaText(editor, content)
-    if (editor.value.trim() !== content.trim()) {
+    if (getTextareaValue(editor).trim() !== content.trim()) {
       throw new Error('DeepSeek editor did not accept the prompt text')
     }
 
     if (!autoSend) return
+
+    // Wait briefly for React to process the input and enable the send button
+    await new Promise(resolve => window.setTimeout(resolve, 100))
 
     const sendButton = await waitForDeepSeekSendButton(editor, inputTimeoutMs)
     sendButton.click()
@@ -110,9 +113,23 @@ function extractConversationId(url: URL): string | undefined {
 
 function setTextareaText(textarea: HTMLTextAreaElement, content: string): void {
   textarea.focus()
-  textarea.value = content
+
+  // Use native value setter so React picks up the change
+  const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(textarea), 'value')
+  if (descriptor?.set) {
+    descriptor.set.call(textarea, content)
+  } else {
+    textarea.value = content
+  }
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: content }))
   textarea.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+function getTextareaValue(textarea: HTMLTextAreaElement): string {
+  // Use native value getter to bypass React's controlled-component override
+  const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(textarea), 'value')
+  if (descriptor?.get) return descriptor.get.call(textarea) as string
+  return textarea.value
 }
 
 async function waitForDeepSeekSendButton(editor: HTMLTextAreaElement, timeoutMs: number): Promise<HTMLElement> {

@@ -1,4 +1,9 @@
 const SKIP_SELECTORS = 'button, svg, style, script, textarea, mat-icon'
+const INLINE_TAGS = new Set([
+  'strong', 'b', 'em', 'i', 'code', 'a', 'br', 'span', 'img',
+  'sub', 'sup', 'u', 's', 'del', 'ins', 'kbd', 'samp', 'mark',
+  'small', 'cite', 'q', 'abbr', 'dfn', 'tt', 'var',
+])
 
 export function extractMarkdownFromDom(node: Node): string {
   return normalizeMarkdown(block(node))
@@ -30,7 +35,7 @@ function block(node: Node, depth = 0): string {
     return `\n${plainText(element)
       .split('\n')
       .map(line => `> ${line}`)
-      .join('\n')}\n`
+      .join('\n')}\n\n`
   }
 
   if (tag === 'ul') {
@@ -43,7 +48,15 @@ function block(node: Node, depth = 0): string {
 
   if (tag === 'table') return tableMarkdown(element)
 
+  if (INLINE_TAGS.has(tag)) return inline(element)
+  if (hasOnlyInlineChildren(element)) return `\n${inlineChildren(element).trim()}\n`
   return [...element.childNodes].map(child => block(child, depth)).join('')
+}
+
+function hasOnlyInlineChildren(element: Element): boolean {
+  const children = [...element.children]
+  if (children.length === 0) return false
+  return children.every(child => INLINE_TAGS.has(child.tagName.toLowerCase()))
 }
 
 function inline(node: Node): string {

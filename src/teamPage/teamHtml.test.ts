@@ -14,8 +14,8 @@ function readTeamDocument(): string {
   return `${readTeamHtml()}\n${readTeamCss()}`
 }
 
-const REMOVED_SITE_IDS = ['ki' + 'mi', 'q' + 'wen']
-const removedSiteLabel = (siteId: string): string => siteId === REMOVED_SITE_IDS[0] ? 'K' + 'imi' : '千' + '问'
+const REMOVED_SITE_IDS = ['ki' + 'mi']
+const removedSiteLabel = (_siteId: string): string => 'K' + 'imi'
 
 describe('team.html chat creation UI', () => {
   it('starts unlocked without a local invite-code activation gate', () => {
@@ -169,6 +169,7 @@ describe('team.html chat creation UI', () => {
     expect(html).toContain('id="template-site-claude"')
     expect(html).toContain('id="template-site-deepseek"')
     expect(html).toContain('id="template-site-grok"')
+    expect(html).toContain('id="template-site-qwen"')
     expect(html).not.toMatch(/id="template-site-gemini"[^>]*checked/)
     expect(html).toMatch(/id="template-site-deepseek"[^>]*checked/)
     for (const site of REMOVED_SITE_IDS) {
@@ -385,10 +386,10 @@ describe('team.html chat creation UI', () => {
     expect(source).toContain("if (deps.templateSiteClaudeEl.checked) return 'claude'")
     expect(source).toContain("if (deps.templateSiteDeepSeekEl.checked) return 'deepseek'")
     expect(source).toContain("if (deps.templateSiteGrokEl.checked) return 'grok'")
-    expect(source).toContain("const VISIBLE_CHAT_SITES = ['gemini', 'chatgpt', 'claude', 'deepseek', 'grok'] as const")
+    expect(source).toContain("const VISIBLE_CHAT_SITES = ['gemini', 'chatgpt', 'claude', 'deepseek', 'grok', 'qwen'] as const")
     for (const site of REMOVED_SITE_IDS) expect(source).not.toContain(`return '${site}'`)
     expect(source).not.toContain('templateSite' + 'K' + 'imiEl')
-    expect(source).not.toContain('templateSite' + 'Q' + 'wenEl')
+    expect(source).toContain('deps.templateSiteQwenEl')
   })
 
   it('stores a default target site on people-library entries instead of the settings menu', () => {

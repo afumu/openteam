@@ -122,6 +122,7 @@ function setupPeopleLibraryView(options: { store: OpenTeamStore; templates: Role
     templateSiteClaudeEl: document.createElement('input'),
     templateSiteDeepSeekEl: document.createElement('input'),
     templateSiteGrokEl,
+    templateSiteQwenEl: document.createElement('input'),
     templateSiteExternalEl,
     templateExternalModelFieldEl,
     templateExternalModelSelectEl,

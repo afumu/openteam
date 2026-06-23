@@ -138,6 +138,7 @@ export interface TeamPageDomRefs {
   templateSiteClaudeEl: HTMLInputElement
   templateSiteDeepSeekEl: HTMLInputElement
   templateSiteGrokEl: HTMLInputElement
+  templateSiteQwenEl: HTMLInputElement
   templateSiteExternalEl: HTMLInputElement
   templateExternalModelFieldEl: HTMLElement
   templateExternalModelSelectEl: HTMLSelectElement
@@ -302,6 +303,7 @@ export function createTeamPageDomRefs(): TeamPageDomRefs {
     templateSiteClaudeEl: requireElement<HTMLInputElement>('#template-site-claude'),
     templateSiteDeepSeekEl: requireElement<HTMLInputElement>('#template-site-deepseek'),
     templateSiteGrokEl: requireElement<HTMLInputElement>('#template-site-grok'),
+    templateSiteQwenEl: requireElement<HTMLInputElement>('#template-site-qwen'),
     templateSiteExternalEl: requireElement<HTMLInputElement>('#template-site-external'),
     templateExternalModelFieldEl: requireElement<HTMLElement>('#template-external-model-field'),
     templateExternalModelSelectEl: requireElement<HTMLSelectElement>('#template-external-model-select'),

@@ -144,6 +144,7 @@ describe('team page dom refs', () => {
       <input id="template-site-claude" />
       <input id="template-site-deepseek" />
       <input id="template-site-grok" />
+      <input id="template-site-qwen" />
       <input id="template-site-external" />
       <div id="template-external-model-field"></div>
       <select id="template-external-model-select"></select>

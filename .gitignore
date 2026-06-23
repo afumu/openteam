@@ -13,3 +13,4 @@ skills-lock.json
 *.log
 .DS_Store
 .idea/
+.codegraph

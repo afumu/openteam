@@ -3,7 +3,7 @@ import type { ChatSite, ExternalModelConfig, GroupRole, OpenTeamStore, RoleModel
 import { normalizeLanguage, translateUi } from '../shared/i18n'
 import type { TeamPageState } from './appState'
 
-const VISIBLE_CHAT_SITES = ['gemini', 'chatgpt', 'claude', 'deepseek', 'grok'] as const
+const VISIBLE_CHAT_SITES = ['gemini', 'chatgpt', 'claude', 'deepseek', 'grok', 'qwen'] as const
 
 interface RolePanelIframeHost {
   recoverRole(role: GroupRole): void
@@ -360,6 +360,7 @@ function siteLabel(site: ChatSite | undefined): string {
   if (site === 'claude') return 'Claude'
   if (site === 'deepseek') return 'DeepSeek'
   if (site === 'grok') return 'Grok'
+  if (site === 'qwen') return 'Qwen'
   return 'Gemini'
 }
 

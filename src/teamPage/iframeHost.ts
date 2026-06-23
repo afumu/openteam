@@ -548,6 +548,7 @@ function siteLabel(site: ChatSite | undefined): string {
   if (site === 'claude') return 'Claude'
   if (site === 'deepseek') return 'DeepSeek'
   if (site === 'grok') return 'Grok'
+  if (site === 'qwen') return 'Qwen'
   return 'Gemini'
 }
 

@@ -510,6 +510,7 @@ function readChatSite(value: unknown): ChatSite | undefined {
   if (normalized.includes('gemini') || normalized === 'google') return 'gemini'
   if (normalized.includes('deepseek')) return 'deepseek'
   if (normalized.includes('grok') || normalized.includes('xai')) return 'grok'
+  if (normalized.includes('qwen') || normalized.includes('千问')) return 'qwen'
   return undefined
 }
 

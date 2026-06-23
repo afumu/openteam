@@ -136,5 +136,28 @@
         "sub_frame"
       ]
     }
+  },
+  {
+    "id": 7,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        {
+          "header": "content-security-policy",
+          "operation": "remove"
+        },
+        {
+          "header": "x-frame-options",
+          "operation": "remove"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||chat.qwen.ai/",
+      "resourceTypes": [
+        "sub_frame"
+      ]
+    }
   }
 ]

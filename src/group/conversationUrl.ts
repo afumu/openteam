@@ -12,6 +12,8 @@ const DEEPSEEK_ORIGIN = 'https://chat.deepseek.com'
 const DEEPSEEK_HOME_URL = `${DEEPSEEK_ORIGIN}/`
 const GROK_ORIGIN = 'https://grok.com'
 const GROK_HOME_URL = `${GROK_ORIGIN}/`
+const QWEN_ORIGIN = 'https://chat.qwen.ai'
+const QWEN_HOME_URL = `${QWEN_ORIGIN}/`
 
 interface ChatSiteStartUrlRole {
   chatSite?: ChatSite
@@ -39,7 +41,7 @@ export function getSafeGeminiIframeSrc(value: string | undefined): string {
 }
 
 export function isSafeSupportedChatUrl(value: string | undefined): value is string {
-  return isSafeGeminiUrl(value) || isSafeChatGptUrl(value) || isSafeClaudeUrl(value) || isSafeDeepSeekUrl(value) || isSafeGrokUrl(value)
+  return isSafeGeminiUrl(value) || isSafeChatGptUrl(value) || isSafeClaudeUrl(value) || isSafeDeepSeekUrl(value) || isSafeGrokUrl(value) || isSafeQwenUrl(value)
 }
 
 export function getSafeSupportedChatUrl(value: string | undefined): string {
@@ -55,6 +57,7 @@ export function getDefaultChatSiteUrl(site: ChatSite | undefined): string {
   if (site === 'claude') return CLAUDE_HOME_URL
   if (site === 'deepseek') return DEEPSEEK_HOME_URL
   if (site === 'grok') return GROK_HOME_URL
+  if (site === 'qwen') return QWEN_HOME_URL
   return GEMINI_HOME_URL
 }
 
@@ -100,7 +103,8 @@ export function extractSupportedConversationId(value: string | undefined): strin
     extractChatGptConversationId(value) ??
     extractClaudeConversationId(value) ??
     extractDeepSeekConversationId(value) ??
-    extractGrokConversationId(value)
+    extractGrokConversationId(value) ??
+    extractQwenConversationId(value)
   )
 }
 
@@ -115,6 +119,7 @@ export function getSupportedChatOriginForSite(value: string | undefined, site: C
   if (site === 'claude') return CLAUDE_ORIGIN
   if (site === 'deepseek') return DEEPSEEK_ORIGIN
   if (site === 'grok') return GROK_ORIGIN
+  if (site === 'qwen') return QWEN_ORIGIN
   return GEMINI_ORIGIN
 }
 
@@ -219,6 +224,30 @@ function extractGrokConversationId(value: string | undefined): string | undefine
 
   const url = new URL(value)
   const match = url.pathname.match(/^\/(?:chat|c)\/([^/]+)/)
+  const conversationId = match?.[1]
+  return conversationId ? decodeURIComponent(conversationId) : undefined
+}
+
+function isSafeQwenUrl(value: string | undefined): value is string {
+  return Boolean(parseSafeQwenUrl(value))
+}
+
+function parseSafeQwenUrl(value: string | undefined): URL | undefined {
+  if (!value || !value.startsWith(QWEN_HOME_URL)) return undefined
+
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && url.hostname === 'chat.qwen.ai' ? url : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function extractQwenConversationId(value: string | undefined): string | undefined {
+  if (!isSafeQwenUrl(value)) return undefined
+
+  const url = new URL(value)
+  const match = url.pathname.match(/^\/(?:c|chat|s)\/([^/?#]+)/)
   const conversationId = match?.[1]
   return conversationId ? decodeURIComponent(conversationId) : undefined
 }

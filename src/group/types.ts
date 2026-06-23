@@ -2,7 +2,7 @@ import type { JSONContent } from '@tiptap/core'
 import type { MessageHighlightColor } from './highlightColors'
 
 export type RoomMode = 'independent' | 'collaborative'
-export type ChatSite = 'gemini' | 'chatgpt' | 'claude' | 'deepseek' | 'grok'
+export type ChatSite = 'gemini' | 'chatgpt' | 'claude' | 'deepseek' | 'grok' | 'qwen'
 export type OpenTeamLanguage = 'en' | 'zh-CN'
 export type RoleModelSource = 'site' | 'external'
 export type ExternalModelFormat = 'openai' | 'anthropic'
