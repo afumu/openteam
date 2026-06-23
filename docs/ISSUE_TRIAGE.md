@@ -49,18 +49,18 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
 - [#1](https://github.com/afumu/openteam/issues/1), [#2](https://github.com/afumu/openteam/issues/2), [#3](https://github.com/afumu/openteam/issues/3), [#5](https://github.com/afumu/openteam/issues/5), [#7](https://github.com/afumu/openteam/issues/7)
   - These are tracking issues. Most listed child tasks now have code coverage in content reply tracking, group copy, external model, and orchestration test suites.
 
-## Still Design Or Repro Gated
+## Design Delivered, Implementation Follow-Up
 
 - [#46](https://github.com/afumu/openteam/issues/46) ACP protocol support
-  - Requires an explicit protocol/security design before implementation.
+  - Adds an explicit protocol/security design before implementation.
   - OpenTeam already has a local-control daemon over HTTP/WebSocket; ACP should be added as a separate local-agent connector instead of exposing arbitrary ACP WebSockets directly to AI pages.
   - Design draft: `docs/ACP.md`.
 - [#25](https://github.com/afumu/openteam/issues/25) Attachment data model, size limits, and privacy boundary
-  - The image-reply path has a scoped attachment model, but user-uploaded arbitrary files still needs MVP scope and privacy copy before implementation.
+  - Defines the MVP upload model, local storage strategy, delivery rules, and privacy copy.
   - Design draft: `docs/MULTIMODAL_ATTACHMENTS.md`.
 - [#6](https://github.com/afumu/openteam/issues/6) Multimodal attachments
-  - Parent design issue remains open until upload, storage, delivery, and unsupported-site fallback are specified.
+  - Defines upload, storage, delivery, and unsupported-site fallback boundaries; #31 is implemented for ChatGPT/Gemini reply images.
   - Design draft: `docs/MULTIMODAL_ATTACHMENTS.md`.
 - [#19](https://github.com/afumu/openteam/issues/19) AI page health status
-  - Existing role status and control status are not yet a unified health protocol.
+  - Defines a separate role health model, data flow, and anti-flicker rules for a future UI implementation.
   - Design draft: `docs/AI_PAGE_HEALTH.md`.
