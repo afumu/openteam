@@ -3,7 +3,7 @@ import { normalizeMessageHighlightColor } from '../group/highlightColors'
 import { defaultMentionTargetForMessage, parseGroupMentions, roleMentionLabelOptionsFromSettings } from '../group/mentionParser'
 import { mapRuntimeRoleStatus } from '../group/runtimeProtocol'
 import type { BackgroundToRoleMessage } from '../group/runtimeProtocol'
-import type { ExternalModelConfig, GroupChat, GroupMessage, GroupRole, MessageImageAttachment, MessageReference, OpenTeamStore, ReplyImageSource, RuntimeFrameBinding } from '../group/types'
+import type { ExternalModelConfig, GroupChat, GroupMessage, GroupRole, MessageImageAttachment, MessageReference, OpenTeamStore, OrchestrationFlow, ReplyImageSource, RuntimeFrameBinding } from '../group/types'
 import { createExternalModelClient, type ExternalModelClient } from './externalModelClient'
 import type { BackgroundMessageRoute } from './messageRouter'
 import type { PromptDelivery, PromptSender } from './promptDelivery'
@@ -13,7 +13,7 @@ import { messageTabId, rememberHost, senderFrameId, senderTabId, type RuntimeMes
 import type { RuntimeFrameRegistry } from './runtimeFrames'
 import type { SitePromptDeliveryLimiter } from './sitePromptDeliveryLimiter'
 import { getChatMessages, getChatRoles, mutateStore, requireChat, requireRole } from './storeAccess'
-import { markOrchestrationRoleError, maybeAdvanceOrchestrationRun } from './orchestrationRuntime'
+import { markOrchestrationRoleError, maybeAdvanceOrchestrationRun, startOrchestrationRun } from './orchestrationRuntime'
 
 const STALE_THINKING_MS = 120_000
 const DEFAULT_EXTERNAL_MODEL_RETRY_DELAYS_MS = [2_000, 2_000, 4_000, 8_000, 15_000] as const
@@ -85,6 +85,19 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       const roles = getChatRoles(store, chat)
       const parsed = parseGroupMentions(raw, roles, { ...roleMentionLabelOptionsFromSettings(store.settings), defaultTarget: defaultMentionTargetForMessage(raw, chat) })
       if (!parsed.ok) throw new Error(parsed.error)
+
+      if (parsed.orchestrationTarget) {
+        const flow = resolveOrchestrationMentionFlow(store, chat, parsed.orchestrationTarget)
+        return {
+          orchestration: {
+            chatId: chat.id,
+            flowId: flow.id,
+            task: parsed.content,
+            maxRounds: flow.maxRounds,
+            maxNodeExecutions: flow.maxNodeExecutions,
+          },
+        }
+      }
 
       let finalTargetRoleIds = parsed.targetRoleIds
       const hasManualRoute = parsed.mentionedRoleIds.length > 0 || Boolean(parsed.mentionsAll) || Boolean(parsed.orchestrationTarget)
@@ -194,28 +207,35 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       return { message: userMessage, deliveries, externalDeliveries }
     })
 
+    const orchestration = 'orchestration' in result ? result.orchestration : undefined
+    if (orchestration) {
+      deps.log.info('message-send:orchestration-start', { chatId, flowId: orchestration.flowId, taskLength: orchestration.task.length })
+      return { ok: true, ...(await startOrchestrationRun(deps, orchestration)) }
+    }
+    const messageResult = result as { message: GroupMessage; deliveries: PromptDelivery[]; externalDeliveries: ExternalPromptDelivery[] }
+
     deps.log.info('message-send:deliveries-ready', {
       chatId,
-      messageId: result.message.id,
+      messageId: messageResult.message.id,
       deliveries: [
-        ...result.deliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'site', chatSite: delivery.chatSite, tabId: delivery.tabId, frameId: delivery.frameId, contentLength: delivery.message.content.length })),
-        ...result.externalDeliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'external', modelId: delivery.model.id, contentLength: delivery.prompt.length })),
+        ...messageResult.deliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'site', chatSite: delivery.chatSite, tabId: delivery.tabId, frameId: delivery.frameId, contentLength: delivery.message.content.length })),
+        ...messageResult.externalDeliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'external', modelId: delivery.model.id, contentLength: delivery.prompt.length })),
       ],
     })
     await deps.broadcastStoreUpdated(store)
 
-    await sendPromptDeliveries(deps, chatId, result.message.id, result.deliveries)
+    await sendPromptDeliveries(deps, chatId, messageResult.message.id, messageResult.deliveries)
     let responseStore = store
-    for (const delivery of result.externalDeliveries) {
+    for (const delivery of messageResult.externalDeliveries) {
       responseStore = await sendExternalModelDelivery(deps, externalModelClient, externalModelRuns, delivery) ?? responseStore
     }
 
     return {
       ok: true,
-      message: result.message,
+      message: messageResult.message,
       deliveries: [
-        ...result.deliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'site' })),
-        ...result.externalDeliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'external' })),
+        ...messageResult.deliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'site' })),
+        ...messageResult.externalDeliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'external' })),
       ],
       store: responseStore,
     }
@@ -1565,6 +1585,30 @@ function resolveReference(store: OpenTeamStore, chat: GroupChat, raw: unknown, n
 
 function readOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() || undefined : undefined
+}
+
+function resolveOrchestrationMentionFlow(
+  store: OpenTeamStore,
+  chat: GroupChat,
+  target: 'default' | { name: string },
+): OrchestrationFlow {
+  const orderedFlows = (store.orchestrationFlowOrderByChatId[chat.id] ?? [])
+    .map(flowId => store.orchestrationFlowsById[flowId])
+    .filter((flow): flow is OrchestrationFlow => Boolean(flow && flow.chatId === chat.id))
+  const extraFlows = Object.values(store.orchestrationFlowsById)
+    .filter((flow): flow is OrchestrationFlow => Boolean(flow && flow.chatId === chat.id && !orderedFlows.some(ordered => ordered.id === flow.id)))
+  const flows = [...orderedFlows, ...extraFlows]
+
+  if (target === 'default') {
+    const flow = flows[0]
+    if (!flow) throw new Error('当前群聊还没有编排流程，请先创建或保存一个编排流程')
+    return flow
+  }
+
+  const name = target.name.trim()
+  const flow = flows.find(candidate => candidate.name.trim() === name)
+  if (!flow) throw new Error(`找不到名为“${name}”的编排流程，请先创建或保存`)
+  return flow
 }
 
 function readReplyContent(value: unknown): string {

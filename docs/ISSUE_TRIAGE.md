@@ -23,6 +23,10 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
 - [#18](https://github.com/afumu/openteam/issues/18) External model timeout and recovery
   - Adds no-token timeout recovery for both streaming and complete paths.
   - Preserves user-initiated aborts so stop reply can still mark replies as stopped.
+- [#27](https://github.com/afumu/openteam/issues/27) `@编排` integration with runtime
+  - Routes `@编排` and `@编排:名称` chat messages into the orchestration runtime.
+  - Adds clear errors when a named flow cannot be found.
+  - Regression: `src/background/messageHandlers.test.ts`.
 
 ## Already Covered In Main
 
@@ -32,8 +36,6 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
   - Covered by `src/teamPage/chatHeaderView.test.ts` and `src/background/messageHandlers.test.ts`.
 - [#24](https://github.com/afumu/openteam/issues/24) Orchestration save button and test/dry-run entry
   - Covered by `src/teamPage/orchestrationModalView.ts` and related modal tests.
-- [#27](https://github.com/afumu/openteam/issues/27) `@编排` integration with runtime
-  - Parser and runtime paths exist in `src/group/mentionParser.ts`, `src/background/messageHandlers.ts`, and orchestration runtime tests.
 - [#31](https://github.com/afumu/openteam/issues/31) ChatGPT/Gemini image replies
   - ChatGPT image extraction, storage, and UI rendering are implemented and tested.
   - Gemini image extraction is still design-gated because the current image storage trust boundary only allows ChatGPT/OpenAI-hosted sources.

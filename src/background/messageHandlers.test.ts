@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDefaultStore } from '../group/store'
-import type { GroupChat, GroupRole, OpenTeamStore, RuntimeFrameBinding } from '../group/types'
+import type { GroupChat, GroupRole, OpenTeamStore, OrchestrationFlow, RuntimeFrameBinding } from '../group/types'
 
 function createStoreWithReadyRole(): OpenTeamStore {
   const store = createDefaultStore()
@@ -30,6 +30,30 @@ function createStoreWithReadyRole(): OpenTeamStore {
   store.chatsById[chat.id] = chat
   store.rolesById[role.id] = role
   return store
+}
+
+function addFlow(store: OpenTeamStore, flow: Partial<OrchestrationFlow> = {}): OrchestrationFlow {
+  const resolved: OrchestrationFlow = {
+    id: flow.id ?? 'flow-1',
+    chatId: flow.chatId ?? 'chat-1',
+    name: flow.name ?? '默认编排',
+    description: flow.description,
+    maxRounds: flow.maxRounds ?? 1,
+    maxNodeExecutions: flow.maxNodeExecutions,
+    stages: flow.stages ?? [{
+      id: 'stage-1',
+      kind: 'roles',
+      name: '执行',
+      roleIds: ['role-1'],
+    }],
+    graph: flow.graph,
+    createdAt: flow.createdAt ?? 1,
+    updatedAt: flow.updatedAt ?? 1,
+  }
+  store.orchestrationFlowsById[resolved.id] = resolved
+  store.orchestrationFlowOrderByChatId[resolved.chatId] ??= []
+  store.orchestrationFlowOrderByChatId[resolved.chatId].push(resolved.id)
+  return resolved
 }
 
 describe('background message handlers', () => {
@@ -287,6 +311,154 @@ describe('background message handlers', () => {
     })
     expect(sendPrompt).not.toHaveBeenCalled()
     expect(draftStore?.rolesById['role-1'].status).toBe('ready')
+  })
+
+  it('starts the default orchestration flow from an @编排 chat message', async () => {
+    vi.resetModules()
+    const startingStore = createStoreWithReadyRole()
+    addFlow(startingStore)
+    let currentStore = structuredClone(startingStore)
+    vi.doMock('./storeAccess', async importOriginal => {
+      const actual = await importOriginal<typeof import('./storeAccess')>()
+      return {
+        ...actual,
+        mutateStore: vi.fn(async (mutator: (store: OpenTeamStore) => unknown) => {
+          const result = await mutator(currentStore)
+          currentStore = structuredClone(currentStore)
+          return { store: currentStore, result }
+        }),
+      }
+    })
+
+    const { createMessageHandlers } = await import('./messageHandlers')
+    const sendPrompt = vi.fn()
+    const counters = new Map<string, number>()
+    const routes = createMessageHandlers({
+      broadcastStoreUpdated: vi.fn(),
+      getChatStatusFromRoles: () => 'running',
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      newId: vi.fn((prefix: string) => {
+        const next = (counters.get(prefix) ?? 0) + 1
+        counters.set(prefix, next)
+        return `${prefix}-${next}`
+      }),
+      now: vi.fn(() => 100),
+      runtimeFrames: {
+        bind: vi.fn(),
+        getByAddress: vi.fn(),
+        getByRole: vi.fn(() => ({ chatId: 'chat-1', roleId: 'role-1', tabId: 101, frameId: 7, ready: true, lastSeenAt: 100 })),
+      },
+      sendRoleMessage: vi.fn(),
+      sendError: vi.fn(),
+      sendPrompt,
+    })
+
+    const sendRoute = routes.find(route => route.type === 'GROUP_MESSAGE_SEND')
+    const response = await sendRoute?.handler({ type: 'GROUP_MESSAGE_SEND', chatId: 'chat-1', raw: '@编排 请做方案' }, {}) as { ok: boolean; run: { id: string; flowId: string }; store: OpenTeamStore }
+
+    expect(response.ok).toBe(true)
+    expect(response.run.flowId).toBe('flow-1')
+    expect(response.store.messagesById['msg-1']).toMatchObject({
+      content: '请做方案',
+      orchestrationKind: 'task',
+      orchestrationRunId: response.run.id,
+    })
+    expect(sendPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      roleId: 'role-1',
+      tabId: 101,
+      frameId: 7,
+      message: expect.objectContaining({
+        type: 'TEAM_SEND_PROMPT',
+        chatId: 'chat-1',
+        roleId: 'role-1',
+      }),
+    }))
+  })
+
+  it('starts a named orchestration flow from an @编排:name chat message', async () => {
+    vi.resetModules()
+    const startingStore = createStoreWithReadyRole()
+    addFlow(startingStore, { id: 'flow-default', name: '默认编排' })
+    addFlow(startingStore, { id: 'flow-review', name: '代码评审' })
+    let currentStore = structuredClone(startingStore)
+    vi.doMock('./storeAccess', async importOriginal => {
+      const actual = await importOriginal<typeof import('./storeAccess')>()
+      return {
+        ...actual,
+        mutateStore: vi.fn(async (mutator: (store: OpenTeamStore) => unknown) => {
+          const result = await mutator(currentStore)
+          currentStore = structuredClone(currentStore)
+          return { store: currentStore, result }
+        }),
+      }
+    })
+
+    const { createMessageHandlers } = await import('./messageHandlers')
+    const counters = new Map<string, number>()
+    const routes = createMessageHandlers({
+      broadcastStoreUpdated: vi.fn(),
+      getChatStatusFromRoles: () => 'running',
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      newId: vi.fn((prefix: string) => {
+        const next = (counters.get(prefix) ?? 0) + 1
+        counters.set(prefix, next)
+        return `${prefix}-${next}`
+      }),
+      now: vi.fn(() => 100),
+      runtimeFrames: {
+        bind: vi.fn(),
+        getByAddress: vi.fn(),
+        getByRole: vi.fn(() => ({ chatId: 'chat-1', roleId: 'role-1', tabId: 101, frameId: 7, ready: true, lastSeenAt: 100 })),
+      },
+      sendRoleMessage: vi.fn(),
+      sendError: vi.fn(),
+      sendPrompt: vi.fn(),
+    })
+
+    const sendRoute = routes.find(route => route.type === 'GROUP_MESSAGE_SEND')
+    const response = await sendRoute?.handler({ type: 'GROUP_MESSAGE_SEND', chatId: 'chat-1', raw: '@编排:代码评审 请评审' }, {}) as { ok: boolean; run: { flowId: string } }
+
+    expect(response.run.flowId).toBe('flow-review')
+  })
+
+  it('fails clearly when an @编排:name chat message has no matching flow', async () => {
+    vi.resetModules()
+    const startingStore = createStoreWithReadyRole()
+    addFlow(startingStore, { id: 'flow-default', name: '默认编排' })
+    let currentStore = structuredClone(startingStore)
+    vi.doMock('./storeAccess', async importOriginal => {
+      const actual = await importOriginal<typeof import('./storeAccess')>()
+      return {
+        ...actual,
+        mutateStore: vi.fn(async (mutator: (store: OpenTeamStore) => unknown) => {
+          const result = await mutator(currentStore)
+          currentStore = structuredClone(currentStore)
+          return { store: currentStore, result }
+        }),
+      }
+    })
+
+    const { createMessageHandlers } = await import('./messageHandlers')
+    const routes = createMessageHandlers({
+      broadcastStoreUpdated: vi.fn(),
+      getChatStatusFromRoles: () => 'ready',
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      newId: vi.fn((prefix: string) => `${prefix}-1`),
+      now: vi.fn(() => 100),
+      runtimeFrames: {
+        bind: vi.fn(),
+        getByAddress: vi.fn(),
+        getByRole: vi.fn(() => undefined),
+      },
+      sendRoleMessage: vi.fn(),
+      sendError: vi.fn(),
+      sendPrompt: vi.fn(),
+    })
+
+    const sendRoute = routes.find(route => route.type === 'GROUP_MESSAGE_SEND')
+
+    await expect(sendRoute?.handler({ type: 'GROUP_MESSAGE_SEND', chatId: 'chat-1', raw: '@编排:不存在 请评审' }, {}))
+      .rejects.toThrow('找不到名为“不存在”的编排流程')
   })
 
   it('ignores role status messages without identity instead of surfacing a delivery error', async () => {
