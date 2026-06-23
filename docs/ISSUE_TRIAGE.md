@@ -27,6 +27,16 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
   - Routes `@编排` and `@编排:名称` chat messages into the orchestration runtime.
   - Adds clear errors when a named flow cannot be found.
   - Regression: `src/background/messageHandlers.test.ts`.
+- [#31](https://github.com/afumu/openteam/issues/31) ChatGPT/Gemini image replies
+  - Adds Gemini generated-image extraction for trusted `googleusercontent.com` reply images.
+  - Extends image attachment capture and bound-frame validation to ChatGPT and Gemini.
+  - Regression: `src/content/sites/gemini.test.ts`, `src/background/imageAttachments.test.ts`, `src/background/messageImageHandlers.test.ts`.
+- [#9](https://github.com/afumu/openteam/issues/9) ChatGPT two-stage thinking capture
+  - Adds explicit coverage that polling waits through ChatGPT generating/thinking state and reports the final answer.
+  - Regression: `src/content/replyObserver.test.ts`.
+- [#11](https://github.com/afumu/openteam/issues/11) DeepSeek long/streaming reply incomplete
+  - Adds explicit coverage that DeepSeek long replies are not reported while the page is still generating.
+  - Regression: `src/content/replyObserver.test.ts`.
 
 ## Already Covered In Main
 
@@ -36,9 +46,6 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
   - Covered by `src/teamPage/chatHeaderView.test.ts` and `src/background/messageHandlers.test.ts`.
 - [#24](https://github.com/afumu/openteam/issues/24) Orchestration save button and test/dry-run entry
   - Covered by `src/teamPage/orchestrationModalView.ts` and related modal tests.
-- [#31](https://github.com/afumu/openteam/issues/31) ChatGPT/Gemini image replies
-  - ChatGPT image extraction, storage, and UI rendering are implemented and tested.
-  - Gemini image extraction is still design-gated because the current image storage trust boundary only allows ChatGPT/OpenAI-hosted sources.
 - [#1](https://github.com/afumu/openteam/issues/1), [#2](https://github.com/afumu/openteam/issues/2), [#3](https://github.com/afumu/openteam/issues/3), [#5](https://github.com/afumu/openteam/issues/5), [#7](https://github.com/afumu/openteam/issues/7)
   - These are tracking issues. Most listed child tasks now have code coverage in content reply tracking, group copy, external model, and orchestration test suites.
 
@@ -57,7 +64,3 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
 - [#19](https://github.com/afumu/openteam/issues/19) AI page health status
   - Existing role status and control status are not yet a unified health protocol.
   - Design draft: `docs/AI_PAGE_HEALTH.md`.
-- [#9](https://github.com/afumu/openteam/issues/9) ChatGPT two-stage thinking capture
-  - Current reply tracker has multiple regressions for staged and reordered replies, but this issue is still marked `status:needs-repro`.
-- [#11](https://github.com/afumu/openteam/issues/11) DeepSeek long/streaming reply incomplete
-  - Current reply observer has DeepSeek virtual-list regressions, but this issue is still marked `status:needs-repro`.

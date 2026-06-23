@@ -141,4 +141,37 @@ describe('Gemini site adapter', () => {
 
     expect(createGeminiAdapter().readResponseMarkdown?.(response)).toBe('## 方案\n\n**结论**：可以做\n\n- 先做复制\n- 再做兜底\n\n```\nconst ok = true\n```')
   })
+
+  it('extracts generated images from Gemini response containers', () => {
+    document.body.innerHTML = `
+      <model-response>
+        <message-content>
+          <p>这里是图片结果。</p>
+          <img
+            alt="生成图片：产品草图"
+            width="1024"
+            height="768"
+            src="https://lh3.googleusercontent.com/generated-image=s2048"
+          >
+          <img
+            alt="外部跟踪图"
+            width="1"
+            height="1"
+            src="https://example.com/tracker.png"
+          >
+        </message-content>
+        <message-actions>
+          <button><img alt="复制图标" src="https://lh3.googleusercontent.com/icon=s24"></button>
+        </message-actions>
+      </model-response>
+    `
+    const response = document.querySelector('message-content')!
+
+    expect(createGeminiAdapter().readResponseImages?.(response)).toEqual([{
+      sourceUrl: 'https://lh3.googleusercontent.com/generated-image=s2048',
+      alt: '生成图片：产品草图',
+      width: 1024,
+      height: 768,
+    }])
+  })
 })

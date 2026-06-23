@@ -5,6 +5,7 @@ import type { RoleToBackgroundMessage } from '../group/runtimeProtocol'
 import { createReplyObserver } from './replyObserver'
 import type { RoleSession } from './roleSession'
 import { createChatGptAdapter } from './sites/chatgpt'
+import { createDeepSeekAdapter } from './sites/deepseek'
 import type { ChatSiteAdapter } from './sites/types'
 
 describe('createReplyObserver', () => {
@@ -181,6 +182,61 @@ describe('createReplyObserver', () => {
     await vi.advanceTimersByTimeAsync(20_000)
 
     expect(sentMessages).not.toContainEqual(expect.objectContaining({ type: 'TEAM_ROLE_REPLY' }))
+
+    vi.useRealTimers()
+  })
+
+  it('waits for the final ChatGPT two-stage answer instead of reporting the thinking stage', async () => {
+    vi.useFakeTimers()
+    document.body.innerHTML = `
+      <section data-turn="assistant" data-testid="conversation-turn-1">
+        <div data-message-author-role="assistant" data-message-id="reply-old">旧回复</div>
+      </section>
+    `
+
+    const sentMessages: RoleToBackgroundMessage[] = []
+    const roleSession = createFakeRoleSession()
+    const observer = createReplyObserver({
+      siteAdapter: createChatGptAdapter({ href: 'https://chatgpt.com/c/conv-1' }),
+      roleSession,
+      log: createFakeLog(),
+      sendRuntimeMessage: async message => {
+        sentMessages.push(message)
+        return { ok: true } as never
+      },
+      reportRoleError: vi.fn(),
+    })
+
+    observer.capturePromptReplyBaseline('msg-chatgpt-two-stage')
+    roleSession.startPrompt('msg-chatgpt-two-stage', 'attempt-chatgpt-two-stage')
+    document.body.insertAdjacentHTML('beforeend', `
+      <section data-turn="assistant" data-testid="conversation-turn-2">
+        <div data-message-author-role="assistant" data-message-id="reply-new" data-turn-start-message="true">
+          <div class="markdown"><p>先思考：需要拆解问题。</p></div>
+          <div class="result-streaming" aria-busy="true"></div>
+        </div>
+      </section>
+    `)
+    observer.startReplyPolling('msg-chatgpt-two-stage', 'attempt-chatgpt-two-stage')
+
+    await vi.advanceTimersByTimeAsync(8_000)
+
+    expect(sentMessages).not.toContainEqual(expect.objectContaining({
+      type: 'TEAM_ROLE_REPLY',
+      messageId: 'msg-chatgpt-two-stage',
+    }))
+
+    document.querySelector('.result-streaming')?.remove()
+    document.querySelector('.markdown')!.innerHTML = '<p>最终回答：这里是完整结论、依据、风险和下一步建议。</p>'
+
+    await vi.advanceTimersByTimeAsync(8_000)
+
+    expect(sentMessages).toContainEqual(expect.objectContaining({
+      type: 'TEAM_ROLE_REPLY',
+      messageId: 'msg-chatgpt-two-stage',
+      replyAttemptId: 'attempt-chatgpt-two-stage',
+      content: '最终回答：这里是完整结论、依据、风险和下一步建议。',
+    }))
 
     vi.useRealTimers()
   })
@@ -579,6 +635,64 @@ describe('createReplyObserver', () => {
       type: 'TEAM_ROLE_REPLY',
       messageId: 'msg-1',
       content: '这是 DeepSeek 在虚拟列表裁剪历史节点后出现的新回复。',
+    }))
+
+    vi.useRealTimers()
+  })
+
+  it('waits for DeepSeek long streaming replies to finish before reporting', async () => {
+    vi.useFakeTimers()
+    document.body.innerHTML = `
+      <div data-virtual-list-item-key="1">
+        <div class="ds-message">
+          <div class="ds-markdown"><p>历史回复</p></div>
+        </div>
+      </div>
+    `
+
+    const sentMessages: RoleToBackgroundMessage[] = []
+    const roleSession = createFakeRoleSession()
+    const observer = createReplyObserver({
+      siteAdapter: createDeepSeekAdapter({ href: 'https://chat.deepseek.com/a/chat/s/conv-1' }),
+      roleSession,
+      log: createFakeLog(),
+      sendRuntimeMessage: async message => {
+        sentMessages.push(message)
+        return { ok: true } as never
+      },
+      reportRoleError: vi.fn(),
+    })
+
+    observer.capturePromptReplyBaseline('msg-deepseek-long')
+    roleSession.startPrompt('msg-deepseek-long', 'attempt-deepseek-long')
+    document.body.insertAdjacentHTML('beforeend', `
+      <div data-virtual-list-item-key="2">
+        <div class="ds-message">
+          <div class="ds-markdown"><p>先输出的一段长回复，后面还会继续补全。</p></div>
+        </div>
+      </div>
+      <button type="button" aria-label="停止生成">停止</button>
+    `)
+    observer.startReplyPolling('msg-deepseek-long', 'attempt-deepseek-long')
+
+    await vi.advanceTimersByTimeAsync(20_000)
+
+    expect(sentMessages).not.toContainEqual(expect.objectContaining({
+      type: 'TEAM_ROLE_REPLY',
+      messageId: 'msg-deepseek-long',
+    }))
+
+    const finalText = '先输出的一段长回复，后面还会继续补全。现在补齐完整结论、关键依据、风险判断、执行步骤和验收标准。'
+    document.querySelector('button[aria-label="停止生成"]')?.remove()
+    document.querySelectorAll('.ds-markdown')[1]!.innerHTML = `<p>${finalText}</p>`
+
+    await vi.advanceTimersByTimeAsync(8_000)
+
+    expect(sentMessages).toContainEqual(expect.objectContaining({
+      type: 'TEAM_ROLE_REPLY',
+      messageId: 'msg-deepseek-long',
+      replyAttemptId: 'attempt-deepseek-long',
+      content: finalText,
     }))
 
     vi.useRealTimers()

@@ -1,3 +1,4 @@
+import type { ReplyImageSource } from '../../group/types'
 import type { ChatSiteAdapter, ConversationSnapshot } from './types'
 import { keepDeepestResponseContainers } from '../responseContainers'
 import { readResponseTextFromCopyAction, findClickableCopyButton } from './clipboardCopy'
@@ -21,6 +22,7 @@ const GEMINI_SELECTORS = {
   copyButton:
     'button[data-test-id="copy-button"], copy-button button, button[mattooltip="复制回答"], button[aria-label="复制"], button[aria-label*="Copy"], button[aria-label*="复制"]',
   turn: 'model-response',
+  image: 'img[src]',
 }
 
 const SKIP_TAGS = new Set([
@@ -89,6 +91,7 @@ export function createGeminiAdapter(options: GeminiAdapterOptions = {}): ChatSit
     getResponseContainers,
     getAllAssistantReplies,
     readResponseText: extractCleanText,
+    readResponseImages: extractResponseImages,
     readResponseTextFromCopy: node => readResponseTextFromCopy(node, clipboardTimeoutMs, clipboardPollMs),
     readResponseMarkdown: extractMarkdownFromDom,
     findResponseContainer,
@@ -145,6 +148,49 @@ function extractCleanText(node: Node): string {
 
 function findResponseContainer(element: Element | null): Element | null {
   return findClosestMatchingAncestor(element, GEMINI_SELECTORS.response)
+}
+
+function extractResponseImages(node: Node): ReplyImageSource[] {
+  const scope = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
+  if (!scope) return []
+
+  const bySourceUrl = new Map<string, ReplyImageSource>()
+  for (const image of scope.querySelectorAll<HTMLImageElement>(GEMINI_SELECTORS.image)) {
+    if (image.closest('button, [role="button"], message-actions')) continue
+
+    const sourceUrl = normalizeGeneratedImageUrl(image.currentSrc || image.src)
+    if (!sourceUrl) continue
+
+    bySourceUrl.set(sourceUrl, {
+      sourceUrl,
+      ...(image.alt.trim() ? { alt: image.alt.trim() } : {}),
+      ...readImageDimensions(image),
+    })
+  }
+  return [...bySourceUrl.values()]
+}
+
+function normalizeGeneratedImageUrl(value: string): string | undefined {
+  try {
+    const url = new URL(value, location.href)
+    if (url.protocol !== 'https:' || !isGoogleusercontentHost(url.hostname)) return undefined
+    return url.href
+  } catch {
+    return undefined
+  }
+}
+
+function isGoogleusercontentHost(hostname: string): boolean {
+  return hostname === 'googleusercontent.com' || hostname.endsWith('.googleusercontent.com')
+}
+
+function readImageDimensions(image: HTMLImageElement): Pick<ReplyImageSource, 'width' | 'height'> {
+  const width = image.naturalWidth || image.width
+  const height = image.naturalHeight || image.height
+  return {
+    ...(width > 0 ? { width } : {}),
+    ...(height > 0 ? { height } : {}),
+  }
 }
 
 async function readResponseTextFromCopy(node: Node, timeoutMs: number, pollMs: number): Promise<string | undefined> {

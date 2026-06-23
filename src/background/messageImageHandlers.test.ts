@@ -102,6 +102,98 @@ describe('background image reply handling', () => {
     expect(response.store.messagesById['msg-user'].deliveryStatus?.['role-1']).toBe('received')
   })
 
+  it('accepts image replies from a bound Gemini frame', async () => {
+    vi.resetModules()
+    let currentStore = createImageReplyStore('gemini')
+    vi.doMock('./storeAccess', async importOriginal => {
+      const actual = await importOriginal<typeof import('./storeAccess')>()
+      return {
+        ...actual,
+        mutateStore: vi.fn(async (mutator: (store: OpenTeamStore) => unknown) => {
+          const result = await mutator(currentStore)
+          currentStore = structuredClone(currentStore)
+          return { store: currentStore, result }
+        }),
+      }
+    })
+
+    const captureReplyImages = vi.fn(async () => [{
+      id: 'attachment-gemini',
+      type: 'image' as const,
+      status: 'ready' as const,
+      alt: '生成图片：产品草图',
+      mimeType: 'image/webp',
+      size: 128,
+      fileName: 'gemini-image-1.webp',
+    }])
+    const binding: RuntimeFrameBinding = {
+      chatId: 'chat-1',
+      roleId: 'role-1',
+      tabId: 202,
+      frameId: 8,
+      ready: true,
+      lastSeenAt: 1,
+    }
+    const { createMessageHandlers } = await import('./messageHandlers')
+    const routes = createMessageHandlers({
+      broadcastStoreUpdated: vi.fn(),
+      getChatStatusFromRoles: () => 'ready',
+      imageAttachments: {
+        captureReplyImages,
+        deleteByIds: vi.fn(async () => undefined),
+      },
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      newId: vi.fn((prefix: string) => prefix === 'msg' ? 'msg-gemini-image' : `${prefix}-1`),
+      now: vi.fn(() => 100),
+      runtimeFrames: {
+        bind: vi.fn(),
+        getByAddress: vi.fn(() => binding),
+        getByRole: vi.fn(() => binding),
+      },
+      sendRoleMessage: vi.fn(),
+      sendError: vi.fn(),
+      sendPrompt: vi.fn(),
+    })
+
+    const replyRoute = routes.find(route => route.type === 'TEAM_ROLE_REPLY')
+    const response = await replyRoute?.handler({
+      type: 'TEAM_ROLE_REPLY',
+      chatId: 'chat-1',
+      roleId: 'role-1',
+      messageId: 'msg-user',
+      replyAttemptId: 'attempt-1',
+      content: '',
+      images: [{
+        sourceUrl: 'https://lh3.googleusercontent.com/generated-image=s2048',
+        alt: '生成图片：产品草图',
+      }],
+    }, {
+      tab: { id: 202 } as chrome.tabs.Tab,
+      frameId: 8,
+      url: 'https://gemini.google.com/app/conversation',
+    }) as { ok: boolean; message: { id: string }; store: OpenTeamStore }
+
+    expect(response.ok).toBe(true)
+    expect(captureReplyImages).toHaveBeenCalledWith({
+      chatId: 'chat-1',
+      messageId: 'msg-gemini-image',
+      images: [{
+        sourceUrl: 'https://lh3.googleusercontent.com/generated-image=s2048',
+        alt: '生成图片：产品草图',
+      }],
+    })
+    expect(response.store.messagesById['msg-gemini-image']).toMatchObject({
+      id: 'msg-gemini-image',
+      type: 'assistant',
+      content: '',
+      attachments: [{
+        id: 'attachment-gemini',
+        type: 'image',
+        status: 'ready',
+      }],
+    })
+  })
+
   it('keeps stale image replies ignored when attachment cleanup fails', async () => {
     vi.resetModules()
     let currentStore = createImageReplyStore()
@@ -178,7 +270,7 @@ describe('background image reply handling', () => {
   })
 })
 
-function createImageReplyStore(): OpenTeamStore {
+function createImageReplyStore(chatSite: GroupRole['chatSite'] = 'chatgpt'): OpenTeamStore {
   const store = createDefaultStore()
   const chat: GroupChat = {
     id: 'chat-1',
@@ -194,7 +286,7 @@ function createImageReplyStore(): OpenTeamStore {
   const role: GroupRole = {
     id: 'role-1',
     chatId: chat.id,
-    chatSite: 'chatgpt',
+    chatSite,
     name: '视觉设计师',
     status: 'thinking',
     contextCursor: 1,

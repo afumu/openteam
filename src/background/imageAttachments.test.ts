@@ -57,6 +57,48 @@ describe('image attachment service', () => {
     expect(JSON.stringify(attachments)).not.toContain('sig=secret')
   })
 
+  it('downloads trusted Gemini generated images', async () => {
+    const records: ImageAttachmentBlobRecord[] = []
+    const repository = createFakeRepository(records)
+    const fetchImage = vi.fn(async () => new Response(new Blob(['gemini-image'], { type: 'image/webp' }), {
+      status: 200,
+      headers: { 'content-type': 'image/webp' },
+    }))
+    const service = createImageAttachmentService({
+      fetchImage,
+      repository,
+      newId: () => 'attachment-gemini',
+      now: () => 123,
+    })
+
+    const attachments = await service.captureReplyImages({
+      chatId: 'chat-1',
+      messageId: 'msg-1',
+      images: [{
+        sourceUrl: 'https://lh3.googleusercontent.com/generated-image=s2048',
+        alt: '生成图片：产品草图',
+      }],
+    })
+
+    expect(fetchImage).toHaveBeenCalledWith('https://lh3.googleusercontent.com/generated-image=s2048', expect.objectContaining({
+      credentials: 'include',
+    }))
+    expect(records).toHaveLength(1)
+    expect(records[0]).toMatchObject({
+      id: 'attachment-gemini',
+      mimeType: 'image/webp',
+      fileName: 'gemini-image-1.webp',
+    })
+    expect(attachments).toMatchObject([{
+      id: 'attachment-gemini',
+      type: 'image',
+      status: 'ready',
+      alt: '生成图片：产品草图',
+      mimeType: 'image/webp',
+      fileName: 'gemini-image-1.webp',
+    }])
+  })
+
   it('returns error attachments for unsafe or non-image responses without discarding successful images', async () => {
     const records: ImageAttachmentBlobRecord[] = []
     const repository = createFakeRepository(records)

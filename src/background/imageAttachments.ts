@@ -4,6 +4,8 @@ import type { ImageAttachmentBlobRecord, ImageAttachmentRepository } from '../sh
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024
 const CHATGPT_IMAGE_SOURCE_HOSTS = new Set(['chatgpt.com', 'chat.openai.com'])
 const OPENAI_IMAGE_HOST_SUFFIXES = ['.chatgpt.com', '.openai.com', '.oaiusercontent.com']
+const GEMINI_IMAGE_SOURCE_HOSTS = new Set(['gemini.google.com'])
+const GOOGLE_IMAGE_HOST_SUFFIXES = ['.googleusercontent.com']
 const SAFE_IMAGE_MIME_TYPES = new Set([
   'image/avif',
   'image/gif',
@@ -50,15 +52,15 @@ export function createImageAttachmentService(deps: {
         }
 
         try {
-          const sourceUrl = requireSafeChatGptImageUrl(image.sourceUrl)
-          const response = await deps.fetchImage(sourceUrl, {
+          const source = requireSafeImageSourceUrl(image.sourceUrl)
+          const response = await deps.fetchImage(source.href, {
             method: 'GET',
             credentials: 'include',
             redirect: 'follow',
             cache: 'no-store',
           })
           if (!response.ok) throw new Error(`图片下载失败（HTTP ${response.status}）`)
-          if (response.url) requireSafeOpenAiImageUrl(response.url)
+          if (response.url) requireSafeImageRedirectUrl(response.url, source.provider)
 
           const mimeType = normalizeImageMimeType(response.headers.get('content-type'))
           if (!mimeType) throw new Error('远端内容不是图片')
@@ -68,7 +70,7 @@ export function createImageAttachmentService(deps: {
           const blob = await response.blob()
           if (blob.size > maxImageBytes) throw new Error('图片超过 25 MB 上限')
           const normalizedBlob = blob.type === mimeType ? blob : blob.slice(0, blob.size, mimeType)
-          const fileName = `chatgpt-image-${index + 1}.${extensionForMimeType(mimeType)}`
+          const fileName = `${source.provider}-image-${index + 1}.${extensionForMimeType(mimeType)}`
           const record: ImageAttachmentBlobRecord = {
             id,
             chatId: input.chatId,
@@ -119,15 +121,21 @@ function deduplicateImages(images: ReplyImageSource[]): ReplyImageSource[] {
   return [...byUrl.values()]
 }
 
-function requireSafeChatGptImageUrl(value: string): string {
+type ImageSourceProvider = 'chatgpt' | 'gemini'
+
+function requireSafeImageSourceUrl(value: string): { href: string; provider: ImageSourceProvider } {
   const url = parseHttpsUrl(value)
-  if (!url || !CHATGPT_IMAGE_SOURCE_HOSTS.has(url.hostname)) throw new Error('不支持的图片来源')
-  return url.href
+  if (!url) throw new Error('不支持的图片来源')
+  if (CHATGPT_IMAGE_SOURCE_HOSTS.has(url.hostname)) return { href: url.href, provider: 'chatgpt' }
+  if (GEMINI_IMAGE_SOURCE_HOSTS.has(url.hostname) || isGoogleImageHost(url.hostname)) return { href: url.href, provider: 'gemini' }
+  throw new Error('不支持的图片来源')
 }
 
-function requireSafeOpenAiImageUrl(value: string): string {
+function requireSafeImageRedirectUrl(value: string, provider: ImageSourceProvider): string {
   const url = parseHttpsUrl(value)
-  if (!url || !isOpenAiImageHost(url.hostname)) throw new Error('图片重定向到了不受信任的站点')
+  if (!url) throw new Error('图片重定向到了不受信任的站点')
+  if (provider === 'chatgpt' && !isOpenAiImageHost(url.hostname)) throw new Error('图片重定向到了不受信任的站点')
+  if (provider === 'gemini' && !isGeminiImageHost(url.hostname)) throw new Error('图片重定向到了不受信任的站点')
   return url.href
 }
 
@@ -145,6 +153,14 @@ function isOpenAiImageHost(hostname: string): boolean {
     hostname === 'openai.com' ||
     hostname === 'oaiusercontent.com' ||
     OPENAI_IMAGE_HOST_SUFFIXES.some(suffix => hostname.endsWith(suffix))
+}
+
+function isGeminiImageHost(hostname: string): boolean {
+  return GEMINI_IMAGE_SOURCE_HOSTS.has(hostname) || isGoogleImageHost(hostname)
+}
+
+function isGoogleImageHost(hostname: string): boolean {
+  return hostname === 'googleusercontent.com' || GOOGLE_IMAGE_HOST_SUFFIXES.some(suffix => hostname.endsWith(suffix))
 }
 
 function normalizeImageMimeType(value: string | null): string | undefined {
