@@ -55,7 +55,7 @@ export function createDeepSeekAdapter(options: DeepSeekAdapterOptions = {}): Cha
     }
 
     setTextareaText(editor, content)
-    if (editor.value.trim() !== content.trim()) {
+    if (normalizeTextareaValue(editor.value).trim() !== normalizeTextareaValue(content).trim()) {
       throw new Error('DeepSeek editor did not accept the prompt text')
     }
 
@@ -113,6 +113,10 @@ function setTextareaText(textarea: HTMLTextAreaElement, content: string): void {
   textarea.value = content
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: content }))
   textarea.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+function normalizeTextareaValue(value: string): string {
+  return value.replace(/\r\n?/g, '\n')
 }
 
 async function waitForDeepSeekSendButton(editor: HTMLTextAreaElement, timeoutMs: number): Promise<HTMLElement> {

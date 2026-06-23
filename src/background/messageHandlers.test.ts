@@ -1064,6 +1064,76 @@ describe('background message handlers', () => {
     })
   })
 
+  it('locally stops a site reply when the role iframe receiver has disconnected', async () => {
+    vi.resetModules()
+    const startingStore = createStoreWithReadyRole()
+    startingStore.rolesById['role-1'].status = 'thinking'
+    startingStore.rolesById['role-1'].lastPromptMessageId = 'msg-1'
+    startingStore.rolesById['role-1'].replyAttemptId = 'attempt-1'
+    startingStore.messagesById['msg-1'] = {
+      id: 'msg-1',
+      chatId: 'chat-1',
+      seq: 1,
+      type: 'user',
+      content: '请回答',
+      targetRoleIds: ['role-1'],
+      createdAt: 1,
+      status: 'sent',
+      deliveryStatus: { 'role-1': 'sent' },
+    }
+    startingStore.chatsById['chat-1'].messageIds = ['msg-1']
+    startingStore.chatsById['chat-1'].nextMessageSeq = 2
+
+    let currentStore = structuredClone(startingStore)
+    vi.doMock('./storeAccess', async importOriginal => {
+      const actual = await importOriginal<typeof import('./storeAccess')>()
+      return {
+        ...actual,
+        mutateStore: vi.fn(async (mutator: (store: OpenTeamStore) => unknown) => {
+          const result = await mutator(currentStore)
+          currentStore = structuredClone(currentStore)
+          return { store: currentStore, result }
+        }),
+      }
+    })
+
+    const { createMessageHandlers } = await import('./messageHandlers')
+    const broadcastStoreUpdated = vi.fn()
+    const sendRoleMessage = vi.fn(async () => {
+      throw new Error('Could not establish connection. Receiving end does not exist.')
+    })
+    const routes = createMessageHandlers({
+      broadcastStoreUpdated,
+      getChatStatusFromRoles: () => 'ready',
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      newId: vi.fn((prefix: string) => `${prefix}-stopped`),
+      now: vi.fn(() => 200),
+      runtimeFrames: {
+        bind: vi.fn(),
+        getByAddress: vi.fn(),
+        getByRole: vi.fn(() => ({ chatId: 'chat-1', roleId: 'role-1', tabId: 101, frameId: 7, ready: true, lastSeenAt: 100 })),
+      },
+      sendRoleMessage,
+      sendError: vi.fn(),
+      sendPrompt: vi.fn(),
+    })
+
+    const stopRoute = routes.find(route => route.type === 'GROUP_ROLE_STOP_REPLY')
+    const response = await stopRoute?.handler({ type: 'GROUP_ROLE_STOP_REPLY', chatId: 'chat-1', roleId: 'role-1' }, {}) as { store: OpenTeamStore }
+
+    expect(response).toMatchObject({ ok: true, messageId: 'msg-1' })
+    expect(sendRoleMessage).toHaveBeenCalledWith(101, 7, expect.objectContaining({
+      type: 'TEAM_STOP_GENERATION',
+      messageId: 'msg-1',
+      replyAttemptId: 'attempt-1',
+    }))
+    expect(response.store.rolesById['role-1']).toMatchObject({
+      status: 'stopped',
+      replyAttemptId: 'stopped-stopped',
+    })
+    expect(broadcastStoreUpdated).toHaveBeenCalledWith(response.store)
+  })
+
   it('finalizes the visible external assistant message even when abort does not reach the stream', async () => {
     vi.resetModules()
     const startingStore = createStoreWithReadyRole()

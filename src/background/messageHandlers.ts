@@ -304,14 +304,25 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     } else {
       const binding = deps.runtimeFrames.getByRole(chatId, roleId)
       if (!binding?.ready) throw new Error('人员 iframe 尚未就绪，无法停止回复')
-      const response = await deps.sendRoleMessage(binding.tabId, binding.frameId, {
-        type: 'TEAM_STOP_GENERATION',
-        chatId,
-        roleId,
-        messageId: active.messageId,
-        replyAttemptId: active.replyAttemptId,
-      })
-      if (isRecord(response) && response.ok === false) throw new Error(readOptionalString(response.error) ?? '停止回复失败')
+      try {
+        const response = await deps.sendRoleMessage(binding.tabId, binding.frameId, {
+          type: 'TEAM_STOP_GENERATION',
+          chatId,
+          roleId,
+          messageId: active.messageId,
+          replyAttemptId: active.replyAttemptId,
+        })
+        if (isRecord(response) && response.ok === false) throw new Error(readOptionalString(response.error) ?? '停止回复失败')
+      } catch (error) {
+        if (!isReceiverDisconnectedError(error)) throw error
+        deps.log.warn('role-stop-reply:receiver-disconnected', {
+          chatId,
+          roleId,
+          messageId: active.messageId,
+          replyAttemptId: active.replyAttemptId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
 
     const timestamp = deps.now()
@@ -1250,6 +1261,11 @@ async function* streamCompleteFallback(client: ExternalModelClient, input: { mod
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError'
+}
+
+function isReceiverDisconnectedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('Could not establish connection') || message.includes('Receiving end does not exist')
 }
 
 function finalizeActiveExternalAssistantReply(store: OpenTeamStore, chat: GroupChat, role: GroupRole, promptMessageId: string): boolean {

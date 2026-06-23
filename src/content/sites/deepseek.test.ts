@@ -38,6 +38,19 @@ describe('DeepSeek site adapter', () => {
     expect(inputListener).toHaveBeenCalledTimes(1)
   })
 
+  it('accepts prompts after textarea newline normalization', async () => {
+    document.body.innerHTML = `
+      <div class="aaff8b8f">
+        <textarea name="search" placeholder="给 DeepSeek 发送消息 "></textarea>
+      </div>
+    `
+    const editor = document.querySelector<HTMLTextAreaElement>('textarea[name="search"]')!
+
+    await createDeepSeekAdapter().fillAndSend('第一行\r\n第二行\r第三行', false)
+
+    expect(editor.value).toBe('第一行\n第二行\n第三行')
+  })
+
   it('clicks the enabled DeepSeek send button near the composer', async () => {
     document.body.innerHTML = `
       <div class="aaff8b8f">
