@@ -41,6 +41,10 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
   - Stores content-script site health heartbeat snapshots on the bound role.
   - Shows ready/generating/error/blocked/unauthorized health and detail in the role panel.
   - Regression: `src/background/messageHandlers.test.ts`, `src/teamPage/rolePanelView.test.ts`.
+- [#46](https://github.com/afumu/openteam/issues/46) ACP protocol support
+  - Adds daemon-level `agent.list`, `agent.run`, `agent.cancel`, and `agent.read` commands.
+  - Supports ACP-over-WebSocket endpoints with per-agent workspace allowlists and CLI entrypoints.
+  - Regression: `packages/openteamcli/openteam-daemon.test.mjs`, `packages/openteamcli/openteamcli.test.mjs`, `src/shared/localControlProtocol.test.ts`.
 
 ## Already Covered In Main
 
@@ -55,10 +59,6 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
 
 ## Design Delivered, Implementation Follow-Up
 
-- [#46](https://github.com/afumu/openteam/issues/46) ACP protocol support
-  - Adds an explicit protocol/security design before implementation.
-  - OpenTeam already has a local-control daemon over HTTP/WebSocket; ACP should be added as a separate local-agent connector instead of exposing arbitrary ACP WebSockets directly to AI pages.
-  - Design draft: `docs/ACP.md`.
 - [#25](https://github.com/afumu/openteam/issues/25) Attachment data model, size limits, and privacy boundary
   - Defines the MVP upload model, local storage strategy, delivery rules, and privacy copy.
   - Design draft: `docs/MULTIMODAL_ATTACHMENTS.md`.

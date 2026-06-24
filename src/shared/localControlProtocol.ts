@@ -23,6 +23,10 @@ export const OPENTEAM_CONTROL_CAPABILITIES = [
   'task.wait',
   'task.read',
   'run.createAndPost',
+  'agent.list',
+  'agent.run',
+  'agent.cancel',
+  'agent.read',
 ] as const
 
 export type OpenTeamControlCapability = typeof OPENTEAM_CONTROL_CAPABILITIES[number]

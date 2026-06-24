@@ -40,6 +40,21 @@ describe('openteamcli command builder', () => {
       file: 'task.json',
       wait: true,
     })
+    expect(buildCliRequest(['agent', 'list'])).toMatchObject({
+      kind: 'command',
+      command: { action: 'agent.list' },
+    })
+    expect(buildCliRequest(['agent', 'run', '--agent', 'opencode', '--content', '请修复 issue', '--cwd', process.cwd()])).toMatchObject({
+      kind: 'command',
+      command: {
+        action: 'agent.run',
+        payload: {
+          agentId: 'opencode',
+          prompt: '请修复 issue',
+          cwd: process.cwd(),
+        },
+      },
+    })
   })
 
   it('uses the openteamcli name in help output', () => {
@@ -52,6 +67,7 @@ describe('openteamcli command builder', () => {
         'openteamcli role batch-add --chat <chatId> --file roles.json',
         'openteamcli task post|wait|read',
         'openteamcli run create-and-post --file task.json --wait',
+        'openteamcli agent list|run --agent <id> --content <prompt> --cwd <path>',
       ],
     })
   })

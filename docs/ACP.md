@@ -15,21 +15,41 @@ OpenTeam should keep the existing local-control daemon as the only browser-to-lo
 
 This avoids exposing an arbitrary ACP WebSocket URL directly to AI web pages or content scripts.
 
-## MVP Scope
+## Implemented MVP
 
-- Add a local agent config with:
-  - name
-  - ACP endpoint type: `stdio` or `websocket`
-  - command or URL
-  - working directory allowlist
-  - enabled flag
-- Add daemon capabilities:
+- Local agent config is loaded by the daemon from `~/.openteam/acp-agents.json`, or from the `OPENTEAM_ACP_AGENTS` environment variable.
+- Daemon capabilities are exposed through the existing token-authenticated `/command` channel:
   - `agent.list`
   - `agent.run`
   - `agent.cancel`
   - `agent.read`
-- Add extension UI for connection status and manual enablement.
-- Require explicit user action before sending page-derived prompts to a local ACP agent.
+- `agent.run` supports ACP-over-WebSocket endpoints such as a `stdio-to-ws` bridge.
+- `agent.run` enforces a per-agent working directory allowlist before sending any prompt to the ACP endpoint.
+- `openteamcli agent list` and `openteamcli agent run --agent <id> --content <prompt> --cwd <path>` expose the MVP locally.
+
+Example config:
+
+```json
+{
+  "agents": [
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "type": "websocket",
+      "url": "ws://127.0.0.1:3030",
+      "enabled": true,
+      "cwdAllowlist": ["/Users/me/workspace/project"]
+    }
+  ]
+}
+```
+
+The default JSON-RPC method sent to the ACP endpoint is `session/prompt` with `{ "prompt": "...", "cwd": "..." }`. Advanced bridges can override the method with `runMethod` in the agent config.
+
+## Remaining UI Follow-Up
+
+- Add team page UI for local agent selection and run status.
+- Require explicit user action before sending page-derived prompts from the web UI to a local ACP agent.
 
 ## Security Boundaries
 
@@ -41,7 +61,5 @@ This avoids exposing an arbitrary ACP WebSocket URL directly to AI web pages or 
 
 ## Follow-Up Tasks
 
-- Define ACP command/result schema in `src/shared/localControlProtocol.ts`.
-- Extend `packages/openteamcli/openteam-daemon.mjs` with an ACP connector module.
-- Add daemon tests for stdio process startup, WebSocket connection, cancellation, timeout, and path allowlists.
-- Add team page UI for local agent selection and run status.
+- Add optional direct `stdio` process management for ACP agents that are not bridged through WebSocket.
+- Add richer streaming result updates once ACP server event shapes are finalized for the target agents.

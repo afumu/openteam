@@ -94,6 +94,16 @@ export function buildCliRequest(argv) {
     }
   }
 
+  if (group === 'agent') {
+    if (subcommand === 'list') return command('agent.list')
+    if (subcommand === 'run') return command('agent.run', {
+      agentId: requireOption(options, 'agent'),
+      prompt: requireOption(options, 'content'),
+      cwd: requireOption(options, 'cwd'),
+      timeoutMs: numberOption(options.timeout),
+    })
+  }
+
   throw new Error(`未知命令：${argv.join(' ')}`)
 }
 
@@ -318,6 +328,7 @@ export function help() {
       'openteamcli role batch-add --chat <chatId> --file roles.json',
       'openteamcli task post|wait|read',
       'openteamcli run create-and-post --file task.json --wait',
+      'openteamcli agent list|run --agent <id> --content <prompt> --cwd <path>',
     ],
   }
 }
