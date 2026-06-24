@@ -313,6 +313,7 @@ function startOpenTeam(): void {
         seedStoredRoleReplies: replies => replyObserver?.seedStoredRoleReplies(replies),
         sendRuntimeMessage: message => sendBackgroundMessage(message),
       })
+      startStatusHeartbeat()
     }
     return
   }

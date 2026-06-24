@@ -421,8 +421,24 @@ function roleContextProgress(role: GroupRole, ui: (source: string) => string): H
 function roleConnectionStatus(role: GroupRole, ui: (source: string) => string): HTMLElement {
   const status = document.createElement('span')
   status.className = 'role-meta-item'
+  if (role.siteHealth) {
+    const label = ui(siteHealthLabel(role.siteHealth.status))
+    status.textContent = role.siteHealth.detail ? `${label}：${role.siteHealth.detail}` : label
+    return status
+  }
   status.textContent = ui(role.modelSource === 'external' ? '连接 API' : role.geminiConversationUrl ? '网页已连接' : '等待连接')
   return status
+}
+
+function siteHealthLabel(status: NonNullable<GroupRole['siteHealth']>['status']): string {
+  const labels: Record<NonNullable<GroupRole['siteHealth']>['status'], string> = {
+    ready: '页面可用',
+    generating: '页面回复中',
+    error: '页面异常',
+    blocked: '页面被阻止',
+    unauthorized: '需要登录',
+  }
+  return labels[status]
 }
 
 function roleStatusLabel(status: RoleStatus): string {

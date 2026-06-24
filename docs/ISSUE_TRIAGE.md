@@ -37,6 +37,10 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
 - [#11](https://github.com/afumu/openteam/issues/11) DeepSeek long/streaming reply incomplete
   - Adds explicit coverage that DeepSeek long replies are not reported while the page is still generating.
   - Regression: `src/content/replyObserver.test.ts`.
+- [#19](https://github.com/afumu/openteam/issues/19) AI page health status
+  - Stores content-script site health heartbeat snapshots on the bound role.
+  - Shows ready/generating/error/blocked/unauthorized health and detail in the role panel.
+  - Regression: `src/background/messageHandlers.test.ts`, `src/teamPage/rolePanelView.test.ts`.
 
 ## Already Covered In Main
 
@@ -61,6 +65,3 @@ This document records the current open GitHub issue sweep for `afumu/openteam`.
 - [#6](https://github.com/afumu/openteam/issues/6) Multimodal attachments
   - Defines upload, storage, delivery, and unsupported-site fallback boundaries; #31 is implemented for ChatGPT/Gemini reply images.
   - Design draft: `docs/MULTIMODAL_ATTACHMENTS.md`.
-- [#19](https://github.com/afumu/openteam/issues/19) AI page health status
-  - Defines a separate role health model, data flow, and anti-flicker rules for a future UI implementation.
-  - Design draft: `docs/AI_PAGE_HEALTH.md`.

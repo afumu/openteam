@@ -3,7 +3,7 @@ import { normalizeMessageHighlightColor } from '../group/highlightColors'
 import { defaultMentionTargetForMessage, parseGroupMentions, roleMentionLabelOptionsFromSettings } from '../group/mentionParser'
 import { mapRuntimeRoleStatus } from '../group/runtimeProtocol'
 import type { BackgroundToRoleMessage } from '../group/runtimeProtocol'
-import type { ExternalModelConfig, GroupChat, GroupMessage, GroupRole, MessageImageAttachment, MessageReference, OpenTeamStore, OrchestrationFlow, ReplyImageSource, RuntimeFrameBinding } from '../group/types'
+import type { ChatSite, ExternalModelConfig, GroupChat, GroupMessage, GroupRole, MessageImageAttachment, MessageReference, OpenTeamStore, OrchestrationFlow, ReplyImageSource, RoleSiteHealthStatus, RuntimeFrameBinding } from '../group/types'
 import { createExternalModelClient, type ExternalModelClient } from './externalModelClient'
 import type { BackgroundMessageRoute } from './messageRouter'
 import type { PromptDelivery, PromptSender } from './promptDelivery'
@@ -36,6 +36,7 @@ export const MESSAGE_ROUTE_TYPES = [
   'TEAM_ROLE_CONVERSATION_UPDATED',
   'TEAM_SEND_ACK',
   'TEAM_ROLE_STATUS',
+  'TEAM_SITE_STATUS_UPDATE',
   'TEAM_ROLE_REPLY',
   'TEAM_ROLE_REPLY_RESYNC',
   'TEAM_ROLE_ERROR',
@@ -572,6 +573,45 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     return { ok: true, role: result, store }
   }
 
+  const handleSiteStatusUpdate = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
+    const siteId = readSiteId(message.siteId)
+    const status = readSiteHealthStatus(message.status)
+    if (!siteId || !status) return { ok: false, error: '未知页面健康状态' }
+
+    const identity = readIdentityOptional(deps, message, sender)
+    if (!identity) {
+      deps.log.warn('site-status:missing-identity', {
+        siteId,
+        status,
+        detail: readOptionalString(message.detail),
+        senderUrl: sender.url,
+        tabId: messageTabId(message, sender),
+        frameId: senderFrameId(sender),
+      })
+      return { ok: false, error: '缺少 chatId/roleId，已忽略页面健康状态' }
+    }
+
+    const timestamp = deps.now()
+    const detail = readOptionalString(message.detail)
+    deps.log.info('site-status:received', { ...identity, siteId, status, detail, senderUrl: sender.url })
+    const { store, result } = await mutateStore(store => {
+      const chat = requireChat(store, identity.chatId)
+      const role = requireRole(store, chat.id, identity.roleId)
+      role.siteHealth = {
+        siteId,
+        status,
+        ...(detail ? { detail } : {}),
+        updatedAt: timestamp,
+      }
+      role.updatedAt = timestamp
+      chat.updatedAt = timestamp
+      return role
+    })
+
+    await deps.broadcastStoreUpdated(store)
+    return { ok: true, role: result, store }
+  }
+
   const handleRoleReply = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
     const identity = readIdentity(deps, message, sender)
     const content = readReplyContent(message.content)
@@ -773,6 +813,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     { type: 'TEAM_ROLE_CONVERSATION_UPDATED', handler: handleConversationUpdated },
     { type: 'TEAM_SEND_ACK', handler: handleSendAck },
     { type: 'TEAM_ROLE_STATUS', handler: handleRoleStatus },
+    { type: 'TEAM_SITE_STATUS_UPDATE', handler: handleSiteStatusUpdate },
     { type: 'TEAM_ROLE_REPLY', handler: handleRoleReply },
     { type: 'TEAM_ROLE_REPLY_RESYNC', handler: handleRoleReplyResync },
     { type: 'TEAM_ROLE_ERROR', handler: handleRoleError },
@@ -1632,6 +1673,16 @@ function readReplyImageSources(value: unknown): ReplyImageSource[] {
 
 function readOptionalImageDimension(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 20_000 ? value : undefined
+}
+
+function readSiteId(value: unknown): ChatSite | undefined {
+  if (value === 'gemini' || value === 'chatgpt' || value === 'claude' || value === 'deepseek' || value === 'grok') return value
+  return undefined
+}
+
+function readSiteHealthStatus(value: unknown): RoleSiteHealthStatus | undefined {
+  if (value === 'ready' || value === 'generating' || value === 'error' || value === 'blocked' || value === 'unauthorized') return value
+  return undefined
 }
 
 function isTrustedImageSenderUrl(value: string | undefined): boolean {

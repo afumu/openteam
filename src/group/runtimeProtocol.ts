@@ -1,4 +1,4 @@
-import type { ChatSite, GroupRole, OpenTeamStore, ReplyImageSource, RoleStatus } from './types'
+import type { ChatSite, GroupRole, OpenTeamStore, ReplyImageSource, RoleSiteHealthStatus, RoleStatus } from './types'
 
 export type RuntimeRoleStatus =
   | 'opening'
@@ -10,7 +10,7 @@ export type RuntimeRoleStatus =
   | 'offline'
   | 'error'
 
-export type SiteStatus = 'ready' | 'generating' | 'error' | 'blocked' | 'unauthorized'
+export type SiteStatus = RoleSiteHealthStatus
 
 export type SendPromptMessage = {
   type: 'TEAM_SEND_PROMPT'

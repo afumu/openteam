@@ -190,6 +190,49 @@ describe('team page role panel view boundary', () => {
     modal?.querySelector<HTMLButtonElement>('.role-prompt-close')?.click()
     expect(document.querySelector('.role-prompt-modal')).toBeNull()
   })
+
+  it('renders the latest AI page health detail on the member card', () => {
+    const store = makeStoreWithRole()
+    Object.assign(store.rolesById['role-1'], {
+      siteHealth: {
+        siteId: 'chatgpt',
+        status: 'blocked',
+        detail: 'Access Denied',
+        updatedAt: 100,
+      },
+    })
+    const rolePanelEl = document.createElement('aside')
+    const roleSummaryEl = document.createElement('p')
+    const roleListEl = document.createElement('div')
+    rolePanelEl.append(roleSummaryEl, roleListEl)
+
+    const view = createRolePanelView({
+      state: createTeamPageState(),
+      getStore: () => store,
+      rolePanelEl,
+      roleSummaryEl,
+      roleListEl,
+      iframeHost: { recoverRole: vi.fn() },
+      getCurrentChat: () => store.chatsById['chat-1'],
+      getCurrentRoles: () => [store.rolesById['role-1']],
+      emptyCard: (title, body) => {
+        const card = document.createElement('div')
+        card.textContent = `${title}${body}`
+        return card
+      },
+      roleToneClass: () => 'role-tone-0',
+      roleAvatarLabel: name => name?.slice(0, 1) ?? '',
+      insertMention: vi.fn(),
+      refreshCurrentChat: vi.fn(async () => undefined),
+      focusRoleFrame: vi.fn(),
+      runCommand: vi.fn(async () => undefined),
+      showError: vi.fn(),
+    })
+
+    view.renderRolePanel()
+
+    expect(roleListEl.querySelector('.role-meta')?.textContent).toContain('页面被阻止：Access Denied')
+  })
 })
 
 function makeStoreWithRole(): OpenTeamStore {

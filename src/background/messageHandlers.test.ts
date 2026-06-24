@@ -104,6 +104,7 @@ describe('background message handlers', () => {
       'TEAM_ROLE_CONVERSATION_UPDATED',
       'TEAM_SEND_ACK',
       'TEAM_ROLE_STATUS',
+      'TEAM_SITE_STATUS_UPDATE',
       'TEAM_ROLE_REPLY',
       'TEAM_ROLE_REPLY_RESYNC',
       'TEAM_ROLE_ERROR',
@@ -498,6 +499,62 @@ describe('background message handlers', () => {
 
     expect(response).toMatchObject({ ok: false, error: '缺少 chatId/roleId，已忽略状态更新' })
     expect(log.warn).toHaveBeenCalledWith('role-status:missing-identity', expect.objectContaining({ runtimeStatus: 'idle' }))
+  })
+
+  it('stores site health updates from a bound role frame', async () => {
+    vi.resetModules()
+    let currentStore = createStoreWithReadyRole()
+    vi.doMock('./storeAccess', async importOriginal => {
+      const actual = await importOriginal<typeof import('./storeAccess')>()
+      return {
+        ...actual,
+        mutateStore: vi.fn(async (mutator: (store: OpenTeamStore) => unknown) => {
+          const result = await mutator(currentStore)
+          currentStore = structuredClone(currentStore)
+          return { store: currentStore, result }
+        }),
+      }
+    })
+
+    const { createMessageHandlers } = await import('./messageHandlers')
+    const binding: RuntimeFrameBinding = { chatId: 'chat-1', roleId: 'role-1', tabId: 101, frameId: 7, ready: true, lastSeenAt: 1 }
+    const broadcastStoreUpdated = vi.fn()
+    const routes = createMessageHandlers({
+      broadcastStoreUpdated,
+      getChatStatusFromRoles: () => 'ready',
+      log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      newId: vi.fn((prefix: string) => `${prefix}-1`),
+      now: vi.fn(() => 100),
+      runtimeFrames: {
+        bind: vi.fn(),
+        getByAddress: vi.fn(() => binding),
+        getByRole: vi.fn(() => binding),
+      },
+      sendRoleMessage: vi.fn(),
+      sendError: vi.fn(),
+      sendPrompt: vi.fn(),
+    })
+
+    const healthRoute = routes.find(route => route.type === 'TEAM_SITE_STATUS_UPDATE')
+    const response = await healthRoute?.handler({
+      type: 'TEAM_SITE_STATUS_UPDATE',
+      siteId: 'chatgpt',
+      status: 'blocked',
+      detail: 'Access Denied',
+    }, {
+      tab: { id: 101 } as chrome.tabs.Tab,
+      frameId: 7,
+      url: 'https://chatgpt.com/c/test',
+    }) as { ok: boolean; store: OpenTeamStore }
+
+    expect(response.ok).toBe(true)
+    expect((response.store.rolesById['role-1'] as { siteHealth?: unknown }).siteHealth).toEqual({
+      siteId: 'chatgpt',
+      status: 'blocked',
+      detail: 'Access Denied',
+      updatedAt: 100,
+    })
+    expect(broadcastStoreUpdated).toHaveBeenCalledWith(response.store)
   })
 
   it('requests role recovery during ordinary message delivery retries', async () => {
