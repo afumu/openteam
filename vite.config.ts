@@ -58,6 +58,15 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     {
+      name: 'strip-cli-hashbang',
+      enforce: 'pre',
+      transform(code, id) {
+        if (!id.endsWith('.mjs') || !code.startsWith('#!')) return undefined
+        const newline = code.indexOf('\n')
+        return newline === -1 ? '' : code.slice(newline + 1)
+      },
+    },
+    {
       name: 'safe-lodash-global-root',
       transform(source, id) {
         if (!id.endsWith('/lodash-es/_root.js')) return undefined

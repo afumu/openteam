@@ -8,6 +8,18 @@ import { buildCliRequest, help } from './openteamcli.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
+const supportsBinSymlink = (() => {
+  const probeDir = mkdtempSync(join(tmpdir(), 'openteamcli-bin-probe-'))
+  try {
+    symlinkSync(resolve(__dirname, 'openteamcli.mjs'), join(probeDir, 'openteamcli'))
+    return true
+  } catch {
+    return false
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true })
+  }
+})()
+
 describe('openteamcli command builder', () => {
   it('builds doctor and daemon commands', () => {
     expect(buildCliRequest(['doctor'])).toEqual({ kind: 'doctor' })
@@ -72,7 +84,7 @@ describe('openteamcli command builder', () => {
     })
   })
 
-  it('runs when invoked through an npm-style bin symlink', () => {
+  it.runIf(supportsBinSymlink)('runs when invoked through an npm-style bin symlink', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'openteamcli-bin-'))
     const binPath = join(tempDir, 'openteamcli')
     symlinkSync(resolve(__dirname, 'openteamcli.mjs'), binPath)

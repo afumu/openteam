@@ -71,10 +71,10 @@ interface Harness {
     runOrchestrationEl: HTMLButtonElement
   }
   store: OpenTeamStore
-  sendRuntimeMessage: Mock<[string, Record<string, unknown>?], Promise<{ ok?: boolean; store?: OpenTeamStore; flow?: OrchestrationFlow; roles?: GroupRole[]; createdRoleIds?: string[]; reusedRoleIds?: string[] }>>
-  runCommand: Mock<[string, Record<string, unknown>?], Promise<void>>
-  reconnectRolesForSend: Mock<[GroupChat, GroupRole[]], Promise<void>>
-  openExternalModels: Mock<[], void>
+  sendRuntimeMessage: Mock<(type: string, payload?: Record<string, unknown>) => Promise<{ ok?: boolean; store?: OpenTeamStore; flow?: OrchestrationFlow; roles?: GroupRole[]; createdRoleIds?: string[]; reusedRoleIds?: string[] }>>
+  runCommand: Mock<(type: string, payload?: Record<string, unknown>) => Promise<void>>
+  reconnectRolesForSend: Mock<(chat: GroupChat, roles: GroupRole[]) => Promise<void>>
+  openExternalModels: Mock<() => void>
   errors: string[]
   successes: string[]
 }
@@ -148,9 +148,9 @@ function createHarness(): Harness {
       runOrchestrationEl: document.querySelector('#run-orchestration') as HTMLButtonElement,
     },
     store,
-    sendRuntimeMessage: vi.fn<[string, Record<string, unknown>?], Promise<{ ok?: boolean; store?: OpenTeamStore; flow?: OrchestrationFlow; roles?: GroupRole[]; createdRoleIds?: string[]; reusedRoleIds?: string[] }>>(async () => ({ ok: true })),
-    runCommand: vi.fn<[string, Record<string, unknown>?], Promise<void>>(async () => undefined),
-    reconnectRolesForSend: vi.fn<[GroupChat, GroupRole[]], Promise<void>>(async () => undefined),
+    sendRuntimeMessage: vi.fn<(type: string, payload?: Record<string, unknown>) => Promise<{ ok?: boolean; store?: OpenTeamStore; flow?: OrchestrationFlow; roles?: GroupRole[]; createdRoleIds?: string[]; reusedRoleIds?: string[] }>>(async () => ({ ok: true })),
+    runCommand: vi.fn<(type: string, payload?: Record<string, unknown>) => Promise<void>>(async () => undefined),
+    reconnectRolesForSend: vi.fn<(chat: GroupChat, roles: GroupRole[]) => Promise<void>>(async () => undefined),
     openExternalModels: vi.fn(),
     errors: [],
     successes: [],

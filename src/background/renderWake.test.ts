@@ -4,7 +4,7 @@ import { RENDER_WAKE_INTERVAL_MS, RENDER_WAKE_VISIBLE_MS, createRenderWakeSchedu
 describe('createRenderWakeScheduler', () => {
   it('does not activate the role tab immediately after scheduling', async () => {
     vi.useFakeTimers()
-    const update = vi.fn<[number, { active: boolean }], Promise<unknown>>().mockResolvedValue({})
+    const update = vi.fn<(tabId: number, active: { active: boolean }) => Promise<unknown>>().mockResolvedValue({})
     const query = vi.fn().mockResolvedValue([{ id: 10 }])
     const scheduler = createRenderWakeScheduler({ update, query })
 
@@ -18,7 +18,7 @@ describe('createRenderWakeScheduler', () => {
 
   it('briefly activates the role tab after the render interval and restores the previously active tab', async () => {
     vi.useFakeTimers()
-    const update = vi.fn<[number, { active: boolean }], Promise<unknown>>().mockResolvedValue({})
+    const update = vi.fn<(tabId: number, active: { active: boolean }) => Promise<unknown>>().mockResolvedValue({})
     const query = vi.fn().mockResolvedValue([{ id: 77 }])
     const scheduler = createRenderWakeScheduler({ update, query })
 
@@ -34,7 +34,7 @@ describe('createRenderWakeScheduler', () => {
 
   it('keeps waking the role tab until the schedule is cancelled', async () => {
     vi.useFakeTimers()
-    const update = vi.fn<[number, { active: boolean }], Promise<unknown>>().mockResolvedValue({})
+    const update = vi.fn<(tabId: number, active: { active: boolean }) => Promise<unknown>>().mockResolvedValue({})
     const query = vi.fn().mockResolvedValue([{ id: 10 }])
     const scheduler = createRenderWakeScheduler({ update, query })
 
@@ -49,7 +49,7 @@ describe('createRenderWakeScheduler', () => {
 
   it('cancels scheduled render wakes after a reply arrives', async () => {
     vi.useFakeTimers()
-    const update = vi.fn<[number, { active: boolean }], Promise<unknown>>().mockResolvedValue({})
+    const update = vi.fn<(tabId: number, active: { active: boolean }) => Promise<unknown>>().mockResolvedValue({})
     const query = vi.fn().mockResolvedValue([{ id: 10 }])
     const scheduler = createRenderWakeScheduler({ update, query })
 
@@ -64,7 +64,7 @@ describe('createRenderWakeScheduler', () => {
 
   it('restores the previous active tab when cancelled during a wake cycle', async () => {
     vi.useFakeTimers()
-    const update = vi.fn<[number, { active: boolean }], Promise<unknown>>().mockResolvedValue({})
+    const update = vi.fn<(tabId: number, active: { active: boolean }) => Promise<unknown>>().mockResolvedValue({})
     const query = vi.fn().mockResolvedValue([{ id: 10 }])
     const scheduler = createRenderWakeScheduler({ update, query })
 
@@ -81,7 +81,7 @@ describe('createRenderWakeScheduler', () => {
 
   it('serializes wake cycles when multiple role tabs are generating', async () => {
     vi.useFakeTimers()
-    const update = vi.fn<[number, { active: boolean }], Promise<unknown>>().mockResolvedValue({})
+    const update = vi.fn<(tabId: number, active: { active: boolean }) => Promise<unknown>>().mockResolvedValue({})
     const query = vi.fn().mockResolvedValue([{ id: 10 }])
     const scheduler = createRenderWakeScheduler({ update, query })
 

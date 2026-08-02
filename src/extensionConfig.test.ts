@@ -150,7 +150,7 @@ describe('extension security configuration', () => {
     writeFileSync(resolve(root, 'team.css'), '.app{}')
 
     try {
-      expect(collectJavaScriptFiles(root).map(file => file.replace(root, '<root>')).sort()).toEqual([
+      expect(collectJavaScriptFiles(root).map(file => file.replace(root, '<root>').replace(/\\/g, '/')).sort()).toEqual([
         '<root>/assets/chunk.js',
         '<root>/team.js',
       ])

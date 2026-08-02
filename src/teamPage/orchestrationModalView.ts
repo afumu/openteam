@@ -147,6 +147,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     })
     canvas.mount(draft.stages, draft.selectedStageId, draft.graphEdges).then(() => {
       mounted = true
+      render()
     }).catch(error => deps.showError(error instanceof Error ? error.message : String(error)))
   }
 
