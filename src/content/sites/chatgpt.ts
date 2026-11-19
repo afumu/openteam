@@ -13,10 +13,17 @@ const DEFAULT_CLIPBOARD_TIMEOUT_MS = 900
 const DEFAULT_CLIPBOARD_POLL_MS = 40
 
 const CHATGPT_SELECTORS = {
-  editor: 'form[data-type="unified-composer"] #prompt-textarea[contenteditable="true"], #prompt-textarea.ProseMirror[contenteditable="true"]',
+  editor: [
+    'div.ProseMirror[data-composer-markdown][contenteditable="true"]',
+    'form[data-type="unified-composer"] #prompt-textarea[contenteditable="true"]',
+    '#prompt-textarea.ProseMirror[contenteditable="true"]',
+  ].join(', '),
   sendButton:
     'button[data-testid="send-button"], button[aria-label*="发送"], button[aria-label*="Send"], button[aria-label*="提交"], button[aria-label*="Submit"]',
-  response: '[data-message-author-role="assistant"]',
+  response: [
+    '[data-message-author-role="assistant"]',
+    '[data-markdown-copy="contents"][data-dil-source-message-id]',
+  ].join(', '),
   imageResponse: '[data-conversation-screenshot-content]',
   generatedImage:
     'img[src*="/backend-api/estuary/content"], [data-testid*="image"] img[src], [class*="imagegen-image"] img[src]',
